@@ -4,7 +4,7 @@
 ; TASM
 ;
 ; author:       Aron Heirman
-; date:         03/10/2020
+; date:         27/10/2020
 ; program:      Hello World!
 ; -------------------------------------------------------------------
 
@@ -14,70 +14,63 @@ MODEL FLAT, C
 
 ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
-INCLUDE "VEC.INC"
+INCLUDE "MISC.INC"
+INCLUDE "VIDEO.INC"
+
+
+
+; compile-time constants (with macros)
+VMEMADR EQU 0A0000h	; video memory address
+SCRWIDTH EQU 320	; screen witdth
+SCRHEIGHT EQU 200	; screen height
 
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
-
-
-
 CODESEG
 
-main:
-    sti            ; set The Interrupt Flag => enable interrupts
-    cld            ; clear The Direction Flag
+PROC terminateProcess
+	USES eax
+	call setVideoMode, 03h
+	mov	ax,04C00h
+	int 21h
+	ret
+ENDP terminateProcess
 
 
-	mov ah, 09h
-	mov edx, offset msg_ugly
-	int 21h
+PROC main
+	sti
+	cld
+	
+	push ds
+	pop	es
 
-	;mov al, 13h
-	;mov ah, 0
-	;int 10h     ; set graphics video mode.
+	call	setVideoMode,13h
 	
 	
-	;mov al, 1100b; color
-	;mov cx, 10; x
-	;mov dx, 20; y
-	;mov ah, 0ch
-	;int 10h     ; set pixel. 
+	call 	gradientPalette
+	call	updateColourPalette, 64
 	
-	;push offset arrdata
-	;push 25;[offset arrlen]
-	;call print_int_list
-	;add sp, 2
-	call print_int_list, [dword offset arrlen], offset arrdata
+	call	draw_triangle,60,60,60,60, 32
+	call	draw_triangle,80,80,100,100, 63
+	call	draw_triangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
 	
-	mov ah, 09h
-	mov edx, offset msg_end
-	int 21h
-	int 21h
+	call	draw_rectangle,60,60,60,60, 32
+	call	draw_rectangle,80,80,100,100, 63
+	call	draw_rectangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
 	
-	call bubble_sort,  [dword offset arrlen], offset arrdata
+	mov	ah,00h
+	int	16h
 	
-	mov ah, 09h
-	mov edx, offset msg_end
-	int 21h
-	int 21h
-	
-	call print_int_list, [dword offset arrlen], offset arrdata
-	
-	; Terminate process with return code in response to a keystroke.
-    mov ax,4C00h
-	int     21h
+	call terminateProcess
+ENDP main
+
 
 
 ; -------------------------------------------------------------------
 ; DATA
 ; -------------------------------------------------------------------
 DATASEG
-    msg_end         db 13, 10, '$'; 13, 10 == carrige return & \n
-	msg_ugly        db "Hello Really ~Ugly~ World!", 13, 10, '$'; 13, 10 == carrige return & \n
-	arrlen dd 25
-	arrdata dd 814724, 905792, 126987, 913376, 632360, 97541, 278499, 546882, 957507, 964889, 157614, 970593, 957167, 485376, 800281, 141887, 421762, 915736, 792208, 959493, 655741, 35712, 849130, 933994, 678736
-
 
 ; -------------------------------------------------------------------
 ; STACK

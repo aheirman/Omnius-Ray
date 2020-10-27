@@ -4,7 +4,7 @@
 ; TASM
 ;
 ; author:       Aron Heirman
-; date:         03/10/2020
+; date:         27/10/2020
 ; program:      Hello World!
 ; -------------------------------------------------------------------
 
@@ -14,12 +14,41 @@ MODEL FLAT, C
 
 ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
-INCLUDE "VEC.INC"
+INCLUDE "MISC.INC"
 
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
 CODESEG
+
+PROC print_byte_list
+	ARG @@len:dword, @@data:dword
+	USES edi, ebx, eax
+	
+	mov edi, [@@len]
+	inc edi
+	mov ebx, [@@data]
+	
+	
+@@beg_print_list:
+	sub edi, 1
+	jz @@end_print_list
+	
+	mov eax, [ebx]
+	and eax, 0FFh
+	
+	call print_int, eax
+	add ebx, 1
+
+	jmp @@beg_print_list
+@@end_print_list:
+
+	mov ah, 09h
+	mov edx, offset msg_end
+	int 21h
+
+	ret
+ENDP print_byte_list
 
 PROC print_int_list
 	ARG @@len:dword, @@data:dword
