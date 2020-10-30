@@ -4,5 +4,4 @@ GLOBAL draw_rectangle:PROC,\
 	   fillBackground:PROC,\
 	   drawGradient:PROC,\
 	   updateColourPalette:PROC,\
-	   gradientPalette:PROC,\
-	   setVideoMode:PROC
+	   gradientPalette:PROC

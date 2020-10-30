@@ -196,6 +196,29 @@ end_print_char:
 	ret
 ENDP print_int_eax
 
+PROC print_endl
+	uses eax, edx
+	mov ah, 09h
+	mov edx, offset msg_end
+	int 21h
+	ret
+ENDP print_endl
+
+PROC setVideoMode
+	ARG @@mode:word
+	USES eax
+	mov ax, [@@mode]
+	int 10h     ; set graphics video mode.
+	ret
+ENDP setVideoMode
+
+PROC terminate_process
+	USES eax
+	call setVideoMode, 03h
+	mov	ax,04C00h
+	int 21h
+	ret
+ENDP terminate_process
 
 DATASEG
     msg_end         db 13, 10, '$'; 13, 10 == carrige return & \n

@@ -27,14 +27,6 @@ SCRHEIGHT EQU 200	; screen height
 ; -------------------------------------------------------------------
 CODESEG
 
-PROC setVideoMode
-	ARG @@mode:word
-	USES eax
-	mov ax, [@@mode]
-	int 10h     ; set graphics video mode.
-	ret
-ENDP setVideoMode
-
 ; create a gradient palette
 PROC gradientPalette
 	USES eax, ecx, edx, esi

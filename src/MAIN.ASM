@@ -16,7 +16,7 @@ ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
 INCLUDE "MISC.INC"
 INCLUDE "VIDEO.INC"
-
+INCLUDE "RAYTRACE.INC"
 
 
 ; compile-time constants (with macros)
@@ -29,14 +29,6 @@ SCRHEIGHT EQU 200	; screen height
 ; -------------------------------------------------------------------
 CODESEG
 
-PROC terminateProcess
-	USES eax
-	call setVideoMode, 03h
-	mov	ax,04C00h
-	int 21h
-	ret
-ENDP terminateProcess
-
 
 PROC main
 	sti
@@ -44,25 +36,29 @@ PROC main
 	
 	push ds
 	pop	es
-
+	finit
+	
 	call	setVideoMode,13h
 	
 	
 	call 	gradientPalette
 	call	updateColourPalette, 64
 	
-	call	draw_triangle,60,60,60,60, 32
-	call	draw_triangle,80,80,100,100, 63
-	call	draw_triangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
+	;call	draw_triangle,60,60,60,60, 32
+	;call	draw_triangle,80,80,100,100, 63
+	;call	draw_triangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
 	
-	call	draw_rectangle,60,60,60,60, 32
-	call	draw_rectangle,80,80,100,100, 63
-	call	draw_rectangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
+	;call	draw_rectangle,60,60,60,60, 32
+	;call	draw_rectangle,80,80,100,100, 63
+	;call	draw_rectangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
+	
+	call ray_trace
+	
 	
 	mov	ah,00h
 	int	16h
 	
-	call terminateProcess
+	call terminate_process
 ENDP main
 
 
@@ -75,6 +71,6 @@ DATASEG
 ; -------------------------------------------------------------------
 ; STACK
 ; -------------------------------------------------------------------
-STACK 100h; 100 bytes groot
+STACK 300h; 100 bytes groot
 
 END main
