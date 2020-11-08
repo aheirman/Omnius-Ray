@@ -167,19 +167,19 @@ ENDP print_vec3_int
 ; This function automatically updates the position of the ray to the intersection &
 ;   changes the direction to the ray
 ;--
-PROC intersect
+PROC intersect_sphere
 @@LOCAL_STACK_SIZE EQU (4*5)  + VEC3_SIZE*1 + SPHERE_SIZE
 	; "4 +", ik wil dat esp wijst naar de volgende cel.
 	; 4 floats a,b,c, discriminantcdv
 	; one vec3: oc
-	
+	; en de sphere
 	
 	; Based on:
 	; http://viclw17.github.io/2018/07/16/raytracing-ray-sphere-intersection/
 	; float info: http://www.ray.masmcode.com/tutorial/fpuchap7.htm#ftst
 	;TODO: loop over all spheres
-	ARG @@ray_ptr:dword
-	uses eax, ebx, ecx, edi
+	ARG @@ray_ptr:dword;, @@sphere_ptr:dword
+	uses eax, ebx, ecx, edx, edi
 	
 	
 
@@ -222,18 +222,16 @@ rep stosb
 	fldpi
 	fdivp
 	fstp [dword ebx + sphere_obj.radius]
+	mov edx, [dword offset nr_1]; NOTE THIS IS A FLOAT
+	mov  [dword ebx + sphere_obj.color_r], edx
+	mov  [dword ebx + sphere_obj.color_g], edx
+	mov  [dword ebx + sphere_obj.color_b], edx
 	
 
 	
 	;------------------------
 	; vec3 oc = r.origin() - center;
 	call vec3_sub_res, eax, ebx, ecx
-	
-	;call print_vec3, eax
-	;call print_vec3, ebx
-	;call print_vec3, ecx
-	
-	;call print_byte_list, 35, edi
 	
 	;------------------------
 	;  float a = dot(r.direction(), r.direction());
@@ -253,27 +251,12 @@ rep stosb
 	; float b = 2.0 * dot(oc, r.direction());
 	mov ebx, ebp
 	sub ebx, 4*2
-	;call print_vec3, ecx
-	;call print_vec3, eax
 	call vec3_dot, ecx, eax, ebx
-
-	;sub esp, 4
-	;fld [dword ebx]
-	;fist [dword esp]
-	;call print_int, [dword esp]
-	;add esp, 4
 	
 	fld  [dword ebx]
 	fld [dword offset nr_two]
 	fmul
 	fstp [dword ebx]
-
-	
-	;sub esp, 4
-	;fld [dword ebx]
-	;fist [dword esp]
-	;call print_int, [dword esp]
-	;add esp, 4
 	
 	;------------------------
 	; float c = dot(oc,oc) - radius*radius;
@@ -285,12 +268,6 @@ rep stosb
 	mov ebx, ebp
 	sub ebx, 4*3
 	call vec3_dot, ecx, ecx, ebx; tijdelijk in c opslaan
-
-	;sub esp, 4
-	;fld [dword ebx]
-	;fistp [dword esp]
-	;call print_int, [dword esp]
-	;add esp, 4
 	
 	fld [dword ebx]
 	;fsubp ST(0), ST(1)
@@ -298,12 +275,6 @@ rep stosb
 	fchs
 	
 	fstp  [dword ebx]; float c
-	
-	;sub esp, 4
-	;fld [dword ebx]
-	;fistp [dword esp]
-	;call print_int, [dword esp]
-	;add esp, 4
 	
 	;------------------------
 	; float discriminant = b*b - 4*a*c;
@@ -337,8 +308,8 @@ rep stosb
 	;call print_int, [dword esp]
 	;add esp, 4
 	
-	mov ebx, eax; ray pointer to ebx
-	sub ebx, RAY_DIR_OFFSET
+	mov ebx, eax; ray dir pointer to ebx; eax is nu vrij
+	sub ebx, RAY_DIR_OFFSET; ray pointer to ebx
 	ftst                ;equivalent met fldz fcomp ST(1)
 	                    ;compare the value of ST(0) to +0.0
 	fstsw ax            ;copy the Status Word containing the result to AX
@@ -383,6 +354,11 @@ rep stosb
 	jmp @@neg_discriminant_of_negatieve_afstand
 @@afstand_positief:
 	mov [ebx + ray_obj.hit], 1
+	
+	;----
+	; bereken de afstand
+	;----
+	push ebx
 	fchs
 	fld [dword offset nr_two]
 	mov ebx, ebp
@@ -392,8 +368,22 @@ rep stosb
 	fdivp st(1), st
 	mov ebx, ebp
 	sub ebx, 4*5
-	fstp [dword ebx]
+	fstp [dword ebx]; sla lengte op
+	pop ebx
+	;---------
 	
+	;----
+	; bereken de kleur: gebruikt eax
+	;----
+	fld1
+	fstp [ebx + ray_obj.color_r]
+	fldz
+	fstp [ebx + ray_obj.color_g]
+	fldpi
+	fstp [ebx + ray_obj.color_b]
+	
+
+
 	jmp @@finish
 	
 @@neg_discriminant_of_negatieve_afstand:
@@ -415,11 +405,11 @@ rep stosb
 	add esp, @@LOCAL_STACK_SIZE
 	pop ebp
 	ret
-ENDP intersect
+ENDP intersect_sphere
 
 PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
-	USES eax, ebx, ecx, edi, esi
+	USES eax, ebx, ecx, edx, edi, esi
 	
 	push ebp
 	mov ebp, esp
@@ -483,11 +473,10 @@ rep stosb
 	fst  [dword ebx + ray_obj.origin_y]
 	fldz
 	fstp [dword ebx + ray_obj.origin_z]
-	;mov  [dword ebx + ray_obj.hit], 1
 	;call print_ray, ebx
 	
 
-	call intersect, ebx
+	call intersect_sphere, ebx
 	;call print_ray, ebx
 	;--
 
@@ -497,11 +486,72 @@ rep stosb
 	jz @@no_hit
 	
 	;---
-	; Get Color
+	; Get Color using: eax, edx
 	;---
 	;Bit    7  6  5  4  3  2  1  0
 	;Data   R  R  R  G  G  G  B  B
-	mov [dword esi], 128
+	xor eax, eax; Will be used as the packed color
+	
+	fld [dword offset nr_max_byte_float]
+	fld [dword ebx + ray_obj.color_b]
+	fld [dword ebx + ray_obj.color_g]
+	fld [dword ebx + ray_obj.color_r]
+	
+	;---
+	;red
+	;---
+	fmul st, st(3)
+	fistp [dword esp]
+	mov edx, [dword esp]
+	;call print_int, edx
+
+	
+	cmp edx, 255
+	jl @@not_cliping_r
+	;call print_endl
+	mov edx, 255
+@@not_cliping_r:
+	and edx, 224; 3 bovenste bits
+	;call print_int, edx
+	add eax, edx
+	;---
+	;green
+	;---
+	fmul st, st(2)
+	fistp [dword esp]
+	mov edx, [dword esp]
+	;call print_int, edx
+	cmp edx, 255
+	jl @@not_cliping_g
+	;call print_endl
+	mov edx, 255
+@@not_cliping_g:
+	and edx, 224
+	;call print_int, edx
+	shr edx, 3
+	add eax, edx
+	;---
+	; blue
+	;---
+	fmul st, st(1)
+	fistp [dword esp]
+	mov edx, [dword esp]
+	;call print_int, edx
+	cmp edx, 255
+	jl @@not_cliping_b
+	mov edx, 255
+	;call print_endl
+@@not_cliping_b:
+	and edx, 224
+	;call print_int, edx
+	shr edx, 6
+	add eax, edx
+	;--------------------
+	; End of color
+	;--------------------
+	
+	
+	mov [dword esi], eax
 	jmp @@after_hit
 @@no_hit:
 	mov [dword esi], 0
@@ -525,10 +575,12 @@ rep stosb
 ENDP ray_trace
 
 DATASEG
-	nr_four         dd 4.0
-	nr_two          dd 2.0
-	nr_neg_half     dd -0.5
-	nr_aspect_ratio dd 1.2
+	nr_max_byte_float dd 255.0
+	nr_four           dd 4.0
+	nr_two            dd 2.0
+	nr_neg_half       dd -0.5
+	nr_aspect_ratio   dd 1.2
+	nr_1              dd 1.0
 	msg_comparison_was_indeterminate db "comparison_was_indeterminat", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 

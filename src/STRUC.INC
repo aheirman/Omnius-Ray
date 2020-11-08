@@ -8,9 +8,10 @@ STRUC vec3
 	z    dd 0.0
 ENDS
 
-;Size: 6*4ytes + 4 bytes = 28 bytes
-RAY_SIZE EQU 28
-RAY_DIR_OFFSET EQU 12
+;Size: 9*4ytes + 2 bytes = 38 bytes
+RAY_SIZE EQU 38
+RAY_DIR_OFFSET EQU 12; 3*4
+RAY_COL_OFFSET EQU 24; 6*4
 RAY_CONTROL_OFFSET EQU 27
 STRUC ray_obj
 	origin_x    dd 0.0
@@ -19,17 +20,24 @@ STRUC ray_obj
 	direction_x dd 0.0; NOTE: MUST BE NORMALIZED
 	direction_y dd 0.0
 	direction_z dd 0.0
-	color_r     db 0
-	color_g     db 0
-	color_b     db 0
+	color_r     dd 0.0; eenheid: 100 lux
+	color_g     dd 0.0
+	color_b     dd 0.0
 	hit         db 0
+	count       db 0
 ENDS ray_obj
 
-;Size: 4*4ytes + 0 bytes = 16 bytes
-SPHERE_SIZE EQU 16
+;Size: 7*4ytes + 2 bytes = 30 bytes
+SPHERE_SIZE EQU 30
+SPHERE_COLOR_OFFSET EQU 16
 STRUC sphere_obj
 	origin_x    dd 0.0
 	origin_y    dd 0.0
 	origin_z    dd 0.0
 	radius      dd 0.0
+	color_r     dd 0   ; in byte procent: 255: 100%, 0: 0% indien het reflectief is,
+	color_g     dd 0   ; anders is het 100 lux
+	color_b     dd 0
+	control     db 0; bit 0: LOW: reflectief, HIGH: lichtbron
+	padding     db 0
 ENDS sphere_obj

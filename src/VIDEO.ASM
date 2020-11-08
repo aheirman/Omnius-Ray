@@ -114,27 +114,49 @@ rep outsb
 ENDP updateColourPalette
 
 ; draw gradient on screen
-PROC drawGradient
+PROC drawGradient_64
 	USES eax, ecx, edi
 
 	mov edi, VMEMADR
 	mov ecx, SCRHEIGHT
 	
 @@screenloop:
-	xor al, al
+	xor ax, ax
 	push ecx
 @@lineloop:
 	mov ecx, SCRWIDTH/64
 rep stosb
-	inc al
-	cmp al, 64
+	inc ax
+	cmp ax, 64
 	jl @@lineloop
 	pop ecx
 	loop @@screenloop
 
 
 	ret
-ENDP drawGradient
+ENDP drawGradient_64
+
+PROC drawGradient_256
+	USES eax, ecx, edi
+
+	mov edi, VMEMADR
+	mov ecx, SCRHEIGHT
+	
+@@screenloop:
+	xor ax, ax
+	push ecx
+@@lineloop:
+    stosb
+	inc ax
+	cmp ax, 256
+	jl @@lineloop
+	add edi,  SCRWIDTH-256
+	pop ecx
+	loop @@screenloop
+
+
+	ret
+ENDP drawGradient_256
 
 ; Fill the background (for mode 13h)
 PROC fillBackground
