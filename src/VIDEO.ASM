@@ -29,7 +29,7 @@ CODESEG
 
 ; create a gradient palette
 PROC gradientPalette
-	USES eax, ecx, edx, esi
+	USES eax, ecx, edx
 	;---
 	; Set Colors
 	;---
@@ -52,23 +52,55 @@ PROC gradientPalette
 	ret
 ENDP gradientPalette
 
+; create a 8-bit truecolor palette
+PROC truecolor_palette
+	USES eax, ecx, edx
+	;---
+	; Set Colors
+	;---
+	
+	xor ecx, ecx
+	mov eax, offset palette
+	;Bit    7  6  5  4  3  2  1  0
+	;Data   R  R  R  G  G  G  B  B
+	
+@@begin_r_loop:
+	mov edx, ecx
+	and edx, 224
+	shr edx, 2
+	mov [eax],   dl; r, 6bit
+	mov edx, ecx
+	and edx, 28
+	shl edx, 1
+	mov [eax+1], dl; g
+	mov edx, ecx
+	and edx, 3
+	shl edx, 4
+	mov [eax+2], dl; b
+	
+	add eax, 3
+	inc ecx
+	cmp ecx, 256
+	jnz @@begin_r_loop
+	
+	
+	ret
+ENDP truecolor_palette
+
+
+
+
 
 ; Update the colour palette.
 PROC updateColourPalette
-	ARG @@num_colors:byte
+	ARG @@num_colors:word
 	USES eax, ecx, edx, esi
 
 	;---
+	movzx ecx, [@@num_colors]
+	
+	lea ecx, [2*ecx + ecx]
 	xor eax, eax
-	mov al, [@@num_colors]
-	mov edx, 3
-	mul edx
-	mov ecx, eax
-	xor eax, eax
-	;---
-	;mov ecx, 192
-	;mov ecx, 768
-	;---
 
 	cld; clears direction flag 
 	mov esi, offset palette ; set the palette (DAC) address

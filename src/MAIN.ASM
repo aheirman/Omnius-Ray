@@ -41,8 +41,8 @@ PROC main
 	call	setVideoMode,13h
 	
 	
-	call 	gradientPalette
-	call	updateColourPalette, 64
+	call 	truecolor_palette
+	call	updateColourPalette, 256
 	
 	;call	draw_triangle,60,60,60,60, 32
 	;call	draw_triangle,80,80,100,100, 63

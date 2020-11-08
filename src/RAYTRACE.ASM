@@ -496,7 +496,12 @@ rep stosb
 	cmp eax, 0
 	jz @@no_hit
 	
-	mov [dword esi], 60
+	;---
+	; Get Color
+	;---
+	;Bit    7  6  5  4  3  2  1  0
+	;Data   R  R  R  G  G  G  B  B
+	mov [dword esi], 128
 	jmp @@after_hit
 @@no_hit:
 	mov [dword esi], 0
