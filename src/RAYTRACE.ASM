@@ -18,7 +18,6 @@ INCLUDE "RAYTRACE.INC"
 INCLUDE "STRUC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
-INCLUDE "VEC.INC"
 
 ; compile-time constants (with macros)
 VMEMADR EQU 0A0000h	; video memory address
@@ -466,6 +465,11 @@ rep stosb
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
+	;---
+	;Correct for the non square pixels
+	;---
+	fld [dword offset nr_aspect_ratio]
+	fmulp
 	fstp  [dword ebx + ray_obj.origin_x]
 	
 	mov edi, [esp+8]; ecx of outerloop
@@ -516,9 +520,10 @@ rep stosb
 ENDP ray_trace
 
 DATASEG
-	nr_four      dd 4.0
-	nr_two       dd 2.0
-	nr_neg_half  dd -0.5
+	nr_four         dd 4.0
+	nr_two          dd 2.0
+	nr_neg_half     dd -0.5
+	nr_aspect_ratio dd 1.2
 	msg_comparison_was_indeterminate db "comparison_was_indeterminat", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
