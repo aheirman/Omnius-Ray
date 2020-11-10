@@ -8,23 +8,24 @@ STRUC vec3
 	z    dd 0.0
 ENDS
 
-;Size: 9*4ytes + 2 bytes = 38 bytes
-RAY_SIZE EQU 38
-RAY_DIR_OFFSET EQU 12; 3*4
-RAY_COL_OFFSET EQU 24; 6*4
-RAY_CONTROL_OFFSET EQU 27
+;Size: 10*4ytes + 2 bytes = 42 bytes
+RAY_SIZE           EQU 42
+RAY_DIR_OFFSET     EQU 12; 3*4
+RAY_COL_OFFSET     EQU 24; 6*4
+RAY_CONTROL_OFFSET EQU 40; 10*4
 STRUC ray_obj
-	origin_x    dd 0.0
-	origin_y    dd 0.0
-	origin_z    dd 0.0
-	direction_x dd 0.0; NOTE: MUST BE NORMALIZED
-	direction_y dd 0.0
-	direction_z dd 0.0
-	color_r     dd 0.0; eenheid: 100 lux
-	color_g     dd 0.0
-	color_b     dd 0.0
-	hit         db 0
-	count       db 0
+	origin_x          dd 0.0
+	origin_y          dd 0.0
+	origin_z          dd 0.0
+	direction_x       dd 0.0; NOTE: MUST BE NORMALIZED
+	direction_y       dd 0.0
+	direction_z       dd 0.0
+	color_r           dd 0.0; eenheid: 100 lux
+	color_g           dd 0.0
+	color_b           dd 0.0
+	distance_traveled dd 0.0; WARNING: between the last object and this hit.
+	hit               db 0
+	count             db 0
 ENDS ray_obj
 
 ;Size: 7*4ytes + 2 bytes = 30 bytes

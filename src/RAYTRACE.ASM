@@ -164,26 +164,30 @@ PROC print_vec3_int
 ENDP print_vec3_int
 
 ;--
-; This function automatically updates the position of the ray to the intersection &
-;   changes the direction to the ray
+; This function automatically creates the next_ray IF
+;   the next ray has a distance_traveled that is more than
+;   the current distance between source and hit.
+;
+; Thus, if there us no hit, the next_ray will not be updated.
 ;--
 PROC intersect_sphere
-@@LOCAL_STACK_SIZE EQU (4*5)  + VEC3_SIZE*1 + SPHERE_SIZE
+@@LOCAL_STACK_SIZE EQU (4*5)  + VEC3_SIZE*1
 	; "4 +", ik wil dat esp wijst naar de volgende cel.
-	; 4 floats a,b,c, discriminantcdv
+	; 5 floats a,b,c, discriminant, en de ptr naar de sphere
 	; one vec3: oc
-	; en de sphere
 	
 	; Based on:
 	; http://viclw17.github.io/2018/07/16/raytracing-ray-sphere-intersection/
 	; float info: http://www.ray.masmcode.com/tutorial/fpuchap7.htm#ftst
-	;TODO: loop over all spheres
-	ARG @@ray_ptr:dword;, @@sphere_ptr:dword
+	ARG @@sphere_ptr:dword, @@ray_ptr:dword, @@next_ray_ptr:dword
 	uses eax, ebx, ecx, edx, edi
 	
 	
 
 	mov ebx, [@@ray_ptr]; Curses this depends on the current state of the ebp
+	;call print_int, ebx
+	;call print_endl
+	mov edx, [@@sphere_ptr]
 	;call print_ray, eax
 	
 	push ebp
@@ -204,34 +208,27 @@ rep stosb
 	;call print_byte_list, 35, edi
 	;--------------
 	
+
+	
+	
 	mov eax, ebx; =[@@ray_ptr]
+	;---
+	;Store sphere ptr
+	;---
 	mov ebx, ebp
-	sub ebx, 4*5 + VEC3_SIZE*1 + SPHERE_SIZE; point to the Sphere
+	sub ebx, 4*5
+	mov [ebx], edx; =[@@sphere_ptr]
+
 	mov ecx, ebp
 	sub ecx, 4*5 + VEC3_SIZE*1; point to the vector
-	
-	;---
-	; Initialize sphere
-	;---
-	fldz
-	fst  [dword ebx + sphere_obj.origin_x]
-	fstp  [dword ebx + sphere_obj.origin_y]
-	fldpi
-	fstp [dword ebx + sphere_obj.origin_z]
-	fld1
-	fldpi
-	fdivp
-	fstp [dword ebx + sphere_obj.radius]
-	mov edx, [dword offset nr_1]; NOTE THIS IS A FLOAT
-	mov  [dword ebx + sphere_obj.color_r], edx
-	mov  [dword ebx + sphere_obj.color_g], edx
-	mov  [dword ebx + sphere_obj.color_b], edx
 	
 
 	
 	;------------------------
 	; vec3 oc = r.origin() - center;
-	call vec3_sub_res, eax, ebx, ecx
+	; eax: origin is het eerste deel van de ray
+	; ebx: origin is het eerste deel van de sphere
+	call vec3_sub_res, eax, [ebx], ecx
 	
 	;------------------------
 	;  float a = dot(r.direction(), r.direction());
@@ -261,7 +258,8 @@ rep stosb
 	;------------------------
 	; float c = dot(oc,oc) - radius*radius;
 	mov ebx, ebp
-	sub ebx, 4*5 + VEC3_SIZE*1 + SPHERE_SIZE; Sphere
+	sub ebx, 4*5
+	mov ebx, [ebx]
 	fld [dword ebx + sphere_obj.radius]
 	fmul ST(0), ST(0)
 	
@@ -407,6 +405,61 @@ rep stosb
 	ret
 ENDP intersect_sphere
 
+
+PROC intersect_spheres
+@@LOCAL_STACK_SIZE EQU SPHERE_SIZE
+	; 1 sphere
+
+	;TODO: loop over all spheres
+	ARG @@ray_ptr:dword
+	uses eax, ebx, ecx, edx, edi
+	mov ebx, [@@ray_ptr]
+	
+	push ebp
+	mov ebp, esp
+	
+	mov ecx, @@LOCAL_STACK_SIZE
+	sub esp, ecx
+	;----------
+	; Zero initialize
+	xor eax, eax
+	cld
+	mov edi, esp
+rep stosb
+	;----------
+	
+	
+
+	;---
+	; Initialize sphere
+	;---
+	fldz
+	fst  [dword esp + sphere_obj.origin_x]
+	fstp [dword esp + sphere_obj.origin_y]
+	fldpi
+	fstp [dword esp + sphere_obj.origin_z]
+	fld1
+	fldpi
+	fdivp
+	fstp [dword esp + sphere_obj.radius]
+	mov edi, [dword offset nr_1]; NOTE THIS IS A FLOAT
+	mov  [dword esp + sphere_obj.color_r], edi
+	mov  [dword esp + sphere_obj.color_g], edi
+	mov  [dword esp + sphere_obj.color_b], edi
+	
+	;call print_int, ebx
+	mov eax, esp
+	call intersect_sphere, eax, ebx, 0
+	
+	
+	add esp, @@LOCAL_STACK_SIZE
+	pop ebp
+	ret
+ENDP intersect_spheres
+;----------------------------------------------------------
+; ---------------------------- RAYTRACE -------------------
+;----------------------------------------------------------
+
 PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
 	USES eax, ebx, ecx, edx, edi, esi
@@ -414,7 +467,8 @@ PROC ray_trace
 	push ebp
 	mov ebp, esp
 	
-	sub esp, @@LOCAL_STACK_SIZE;         
+	mov ecx, @@LOCAL_STACK_SIZE; DO NOT OPTIMIZE AWAY, IT IS ENEDED FOT THE ZERO INITIALIZE
+	sub esp, ecx
 	; store one ray
 	; store one point
 	; ecx of outerloop
@@ -475,8 +529,8 @@ rep stosb
 	fstp [dword ebx + ray_obj.origin_z]
 	;call print_ray, ebx
 	
-
-	call intersect_sphere, ebx
+	;call print_int, ebx
+	call intersect_spheres, ebx
 	;call print_ray, ebx
 	;--
 
