@@ -116,6 +116,26 @@ end_bubble_sort:
 	ret
 ENDP bubble_sort
 
+
+	;-----
+	; PRINT
+	; prints float on the stack
+	;-----
+PROC print_rounded_float
+	ARG @@var:dword
+	uses eax, ebx
+	
+	fld [@@var]
+	sub esp, 4
+	mov ebx, esp
+
+	fistp [dword ebx]
+	call print_int, [dword ebx]
+	
+	add esp, 4
+	ret
+ENDP print_rounded_float
+
 	;-----
 	; PRINT
 	; prints a var on the stack

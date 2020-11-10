@@ -163,6 +163,30 @@ PROC print_vec3_int
 	ret
 ENDP print_vec3_int
 
+PROC print_sphere
+	ARG @@sphere_ptr:dword
+	uses eax
+	
+	mov eax, [@@sphere_ptr]
+	
+	call print_rounded_float, [dword eax + sphere_obj.origin_x]
+	call print_rounded_float, [dword eax + sphere_obj.origin_y]
+	call print_rounded_float, [dword eax + sphere_obj.origin_z]
+	
+	call print_rounded_float, [dword eax + sphere_obj.radius]
+	
+	call print_rounded_float, [dword eax + sphere_obj.color_r]
+	call print_rounded_float, [dword eax + sphere_obj.color_g]
+	call print_rounded_float, [dword eax + sphere_obj.color_b]
+	
+	;TODO: print control
+	call print_endl
+	call print_endl
+	
+	ret
+ENDP
+
+
 ;--
 ; This function automatically creates the next_ray IF
 ;   the next ray has a distance_traveled that is more than
@@ -171,9 +195,9 @@ ENDP print_vec3_int
 ; Thus, if there us no hit, the next_ray will not be updated.
 ;--
 PROC intersect_sphere
-@@LOCAL_STACK_SIZE EQU (4*5)  + VEC3_SIZE*1
+@@LOCAL_STACK_SIZE EQU (4*6)  + VEC3_SIZE*1
 	; "4 +", ik wil dat esp wijst naar de volgende cel.
-	; 5 floats a,b,c, discriminant, en de ptr naar de sphere
+	; 5 floats a,b,c, discriminant, de lengte, en de ptr naar de sphere
 	; one vec3: oc
 	
 	; Based on:
@@ -216,11 +240,15 @@ rep stosb
 	;Store sphere ptr
 	;---
 	mov ebx, ebp
-	sub ebx, 4*5
+	sub ebx, 4*6
 	mov [ebx], edx; =[@@sphere_ptr]
+	;call print_int, ebx
+	;call print_int, [ebx]
+	;call print_sphere, edx
+	;call print_sphere, [ebx]
 
 	mov ecx, ebp
-	sub ecx, 4*5 + VEC3_SIZE*1; point to the vector
+	sub ecx, 4*6 + VEC3_SIZE*1; point to the vector
 	
 
 	
@@ -258,8 +286,8 @@ rep stosb
 	;------------------------
 	; float c = dot(oc,oc) - radius*radius;
 	mov ebx, ebp
-	sub ebx, 4*5
-	mov ebx, [ebx]
+	sub ebx, 4*6
+	mov ebx, [ebx]; --> sphere
 	fld [dword ebx + sphere_obj.radius]
 	fmul ST(0), ST(0)
 	
@@ -349,55 +377,72 @@ rep stosb
 	jpe @@error_handler
 	jb   @@afstand_positief
 	
-	jmp @@neg_discriminant_of_negatieve_afstand
+	;Als de afstand niet positief is, dan is ze negatief
+	jmp @@finish
+	
 @@afstand_positief:
-	mov [ebx + ray_obj.hit], 1
+	mov [byte ebx + ray_obj.hit], 1
 	
 	;----
 	; bereken de afstand
 	;----
-	push ebx
 	fchs
 	fld [dword offset nr_two]
-	mov ebx, ebp
-	sub ebx, 4
-	fld [dword ebx]
+	mov ecx, ebp
+	sub ecx, 4
+	fld [dword ecx]
 	fmulp
 	fdivp st(1), st
-	mov ebx, ebp
-	sub ebx, 4*5
-	fstp [dword ebx]; sla lengte op
-	pop ebx
-	;---------
+	mov ecx, ebp
+	sub ecx, 4*5
+	fst [dword ecx]; sla lengte op
+	;call print_rounded_float, [dword eax]
+	
+	;-------
+	; Is de nieuwe afstand de kleinste afstand die tot nu toe is gevonden?
+	;------
+	fld [ebx + ray_obj.depth]
+	fcomp
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe @@error_handler
+	jb @@finish
+	
+	fstp [ebx + ray_obj.depth]; Update the ray-depth
 	
 	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	fld1
+	mov eax, ebp
+	sub eax, 4*6
+	mov eax, [eax]
+	;call print_int, eax
+	;call print_int, [eax]
+	;call print_sphere, eax
+	fld  [eax + sphere_obj.color_r]
 	fstp [ebx + ray_obj.color_r]
-	fldz
+	fld  [eax + sphere_obj.color_g]
 	fstp [ebx + ray_obj.color_g]
-	fldpi
+	fld  [eax + sphere_obj.color_b]
 	fstp [ebx + ray_obj.color_b]
 	
 
 
 	jmp @@finish
-	
-@@neg_discriminant_of_negatieve_afstand:
-	mov [ebx + ray_obj.hit], 0
 
-	;mov ah, 09h
-	;mov edx, offset msg_neg_discreminant
-	;int 21h
-
-	jmp @@finish
-	
 @@error_handler:
 	mov ah, 09h
 	mov edx, offset msg_comparison_was_indeterminate
 	int 21h
-	
+
+@@neg_discriminant_of_negatieve_afstand:
+	; DON'T
+	;mov [ebx + ray_obj.hit], 0
+
+	;mov ah, 09h
+	;mov edx, offset msg_neg_discreminant
+	;int 21h
 	
 @@finish:
 	add esp, @@LOCAL_STACK_SIZE
@@ -406,11 +451,9 @@ rep stosb
 ENDP intersect_sphere
 
 
-PROC intersect_spheres
-@@LOCAL_STACK_SIZE EQU SPHERE_SIZE
-	; 1 sphere
-
-	;TODO: loop over all spheres
+PROC intersect_objects
+@@LOCAL_STACK_SIZE EQU RAY_SIZE
+	; De nieuwe ray
 	ARG @@ray_ptr:dword
 	uses eax, ebx, ecx, edx, edi
 	mov ebx, [@@ray_ptr]
@@ -428,34 +471,31 @@ PROC intersect_spheres
 rep stosb
 	;----------
 	
+	mov ecx, [dword offset num_spheres]
+	mov eax, offset sphere_datas
+@@loop_begin:
+	cmp ecx, 0
+	je @@finish
 	
+	
+	;call print_sphere, eax
+	mov edx, esp; ptr naar de nieuwe ray
+	call intersect_sphere, eax, ebx, edx
+	dec ecx
+	add eax, SPHERE_SIZE
+	jmp @@loop_begin
+@@finish:
 
-	;---
-	; Initialize sphere
-	;---
-	fldz
-	fst  [dword esp + sphere_obj.origin_x]
-	fstp [dword esp + sphere_obj.origin_y]
-	fldpi
-	fstp [dword esp + sphere_obj.origin_z]
-	fld1
-	fldpi
-	fdivp
-	fstp [dword esp + sphere_obj.radius]
-	mov edi, [dword offset nr_1]; NOTE THIS IS A FLOAT
-	mov  [dword esp + sphere_obj.color_r], edi
-	mov  [dword esp + sphere_obj.color_g], edi
-	mov  [dword esp + sphere_obj.color_b], edi
-	
-	;call print_int, ebx
-	mov eax, esp
-	call intersect_sphere, eax, ebx, 0
-	
-	
+	; TODO move new ray into old ray
+
 	add esp, @@LOCAL_STACK_SIZE
 	pop ebp
 	ret
-ENDP intersect_spheres
+ENDP intersect_objects
+
+
+
+
 ;----------------------------------------------------------
 ; ---------------------------- RAYTRACE -------------------
 ;----------------------------------------------------------
@@ -501,6 +541,13 @@ rep stosb
 	fst  [dword ebx + ray_obj.direction_y]
 	fstp [dword ebx + ray_obj.direction_x]
 	
+	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
+	fld1
+	fldz
+	fdivp
+	fstp [dword ebx + ray_obj.depth]
+	
+	mov [byte ebx + ray_obj.hit], 0
 	
 	mov [dword esp], ecx
 	mov [dword esp+4], SCRWIDTH
@@ -530,7 +577,7 @@ rep stosb
 	;call print_ray, ebx
 	
 	;call print_int, ebx
-	call intersect_spheres, ebx
+	call intersect_objects, ebx
 	;call print_ray, ebx
 	;--
 
@@ -635,8 +682,16 @@ DATASEG
 	nr_neg_half       dd -0.5
 	nr_aspect_ratio   dd 1.2
 	nr_1              dd 1.0
-	msg_comparison_was_indeterminate db "comparison_was_indeterminat", 13, 10, '$'; 13, 10 == carrige return & \n
+	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
+	
+	;---
+	; Initialize sphere
+	;---
+	num_spheres  dd 3
+	sphere_datas sphere_obj <-0.2, 0.0, 4.0, 0.1, 1.0, 0.0, 0.0, 1>,\
+	                        <0.2,  0.0, 4.0, 0.1, 0.0, 1.0, 0.0, 1>,\
+ 							<0.0,  0.0, 4.0, 0.1, 0.0, 0.0, 1.0, 1>
 
 END

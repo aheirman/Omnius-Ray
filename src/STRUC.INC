@@ -23,7 +23,7 @@ STRUC ray_obj
 	color_r           dd 0.0; eenheid: 100 lux
 	color_g           dd 0.0
 	color_b           dd 0.0
-	distance_traveled dd 0.0; WARNING: between the last object and this hit.
+	depth             dd 0.0; WARNING: between the last object and this hit.
 	hit               db 0
 	count             db 0
 ENDS ray_obj
@@ -36,9 +36,9 @@ STRUC sphere_obj
 	origin_y    dd 0.0
 	origin_z    dd 0.0
 	radius      dd 0.0
-	color_r     dd 0   ; in byte procent: 255: 100%, 0: 0% indien het reflectief is,
-	color_g     dd 0   ; anders is het 100 lux
-	color_b     dd 0
+	color_r     dd 0.0   ; in byte procent: 255: 100%, 0: 0% indien het reflectief is,
+	color_g     dd 0.0   ; anders is het 100 lux
+	color_b     dd 0.0
 	control     db 0; bit 0: LOW: reflectief, HIGH: lichtbron
 	padding     db 0
 ENDS sphere_obj
