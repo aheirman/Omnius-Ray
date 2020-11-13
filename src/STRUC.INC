@@ -42,3 +42,5 @@ STRUC sphere_obj
 	control     db 0; bit 0: LOW: reflectief, HIGH: lichtbron
 	padding     db 0
 ENDS sphere_obj
+
+

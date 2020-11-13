@@ -16,6 +16,7 @@ ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
 INCLUDE "RAYTRACE.INC"
 INCLUDE "STRUC.INC"
+INCLUDE "VEC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
 
@@ -31,58 +32,6 @@ SCRHEIGHT EQU 200	; screen height
 CODESEG
 
 
-;IMPORTANT: ptrs may aliase (That's good) :)
-PROC vec3_sub_res
-	ARG @@VEC3_PTR_links:dword, @@VEC3_PTR_rechts:dword, @@res_ptr:dword
-	USES eax, ebx, ecx
-	
-	mov eax, [@@VEC3_PTR_links]
-	mov ebx, [@@VEC3_PTR_rechts]
-	mov ecx, [@@res_ptr]
-	
-	fld [eax + vec3.x]
-	fld [ebx + vec3.x]
-	fsubp
-	fstp [ecx + vec3.x]
-	
-	fld [eax + vec3.y]
-	fld [ebx + vec3.y]
-	fsubp
-	fstp [ecx + vec3.y]
-	
-	fld [eax + vec3.z]
-	fld [ebx + vec3.z]
-	fsubp
-	fstp [ecx + vec3.z]
-	
-	ret
-ENDP vec3_sub_res
-
-;IMPORTANT: ptrs may aliase (That's good) :)
-PROC vec3_dot
-	ARG @@VEC3_PTR1:dword, @@VEC3_PTR2:dword, @@res_ptr:dword
-	USES eax, ebx
-	
-	mov eax, [@@VEC3_PTR1]
-	mov ebx, [@@VEC3_PTR2]
-	
-	fld  [dword eax + vec3.x]
-	fmul [dword ebx + vec3.x]
-
-	fld  [dword eax + vec3.y]
-	fmul [dword ebx + vec3.y]
-	
-	fld  [dword eax + vec3.z]
-	fmul [dword ebx + vec3.z]
-	
-	faddp
-	faddp
-	
-	mov eax, [@@res_ptr]
-	fstp [dword eax]
-	
-	ret
-ENDP vec3_dot
 
 PROC print_ray
 	ARG @@ray_ptr:dword
@@ -124,30 +73,6 @@ PROC print_ray
 	add esp, 4
 	ret
 ENDP print_ray
-
-PROC print_vec3
-	ARG @@vec_ptr:dword
-	uses eax, ecx
-	
-	mov eax, [@@vec_ptr]
-	sub esp, 4
-	mov ecx, esp
-	
-	
-	fld [dword eax + vec3.x]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + vec3.y]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + vec3.z]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	
-	call print_endl
-	add esp, 4
-	ret
-ENDP print_vec3
 
 PROC print_vec3_int
 	ARG @@vec_ptr:dword
@@ -535,19 +460,27 @@ rep stosb
 	mov [esp+8], ecx
 	xor ecx, ecx
 @@begin_wirdth_loop:
-	fld1
-	fstp [dword ebx + ray_obj.direction_z]
-	fldz
-	fst  [dword ebx + ray_obj.direction_y]
-	fstp [dword ebx + ray_obj.direction_x]
-	
+
 	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
 	fld1
 	fldz
 	fdivp
 	fstp [dword ebx + ray_obj.depth]
-	
 	mov [byte ebx + ray_obj.hit], 0
+	
+	
+	;fldz
+	;fst  [dword ebx + ray_obj.direction_y]
+	;fstp [dword ebx + ray_obj.]
+	
+	fldz
+	fst  [dword ebx + ray_obj.origin_x]
+	fst  [dword ebx + ray_obj.origin_y]
+	fstp  [dword ebx + ray_obj.origin_z]
+	
+
+	fld1
+	fstp [dword ebx + ray_obj.direction_z]
 	
 	mov [dword esp], ecx
 	mov [dword esp+4], SCRWIDTH
@@ -556,12 +489,15 @@ rep stosb
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
+	
 	;---
 	;Correct for the non square pixels
 	;---
 	fld [dword offset nr_aspect_ratio]
 	fmulp
-	fstp  [dword ebx + ray_obj.origin_x]
+	fstp  [dword ebx + ray_obj.direction_x]
+	; Voor orthonormaal gebruik deze
+	;fstp  [dword ebx + ray_obj.origin_x]
 	
 	mov edi, [esp+8]; ecx of outerloop
 	mov [dword esp], edi
@@ -571,9 +507,10 @@ rep stosb
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
-	fst  [dword ebx + ray_obj.origin_y]
-	fldz
-	fstp [dword ebx + ray_obj.origin_z]
+	; Voor orthonormaal gebruik deze
+	;fst  [dword ebx + ray_obj.origin_y]
+	fst  [dword ebx + ray_obj.direction_y]
+
 	;call print_ray, ebx
 	
 	;call print_int, ebx
@@ -690,8 +627,8 @@ DATASEG
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 4.0, 0.1, 1.0, 0.0, 0.0, 1>,\
-	                        <0.2,  0.0, 4.0, 0.1, 0.0, 1.0, 0.0, 1>,\
- 							<0.0,  0.0, 4.0, 0.1, 0.0, 0.0, 1.0, 1>
+	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 1.0, 0.0, 0.0, 1>,\
+	                        <0.2,  0.0, 0.7, 0.1, 0.0, 1.0, 0.0, 1>,\
+	                        <0.0,  0.0, 0.7, 0.1, 0.0, 0.0, 1.0, 1>
 
 END

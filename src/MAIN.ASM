@@ -18,12 +18,6 @@ INCLUDE "MISC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "RAYTRACE.INC"
 
-
-; compile-time constants (with macros)
-VMEMADR EQU 0A0000h	; video memory address
-SCRWIDTH EQU 320	; screen witdth
-SCRHEIGHT EQU 200	; screen height
-
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
