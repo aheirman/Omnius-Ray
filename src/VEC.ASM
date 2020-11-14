@@ -207,6 +207,24 @@ PROC print_vec3
 	ret
 ENDP print_vec3
 
+PROC print_vec3_x1000
+	ARG @@vec_ptr:dword
+	uses eax, ecx
+	
+	mov eax, [@@vec_ptr]
+
+	
+	call print_rounded_floatx1000, [eax]
+	lea ecx, [eax + vec3.y]
+	call print_rounded_floatx1000, [ecx]
+	lea ecx, [eax + vec3.z]
+	call print_rounded_floatx1000, [ecx]
+	
+	call print_endl
+
+	ret
+ENDP print_vec3_x1000
+
 ;IMPORTANT: ptrs may aliase (That's good) :)
 PROC vec3_normalize_dest
 	ARG @@VEC3_PTR:dword, @@res_ptr:dword
@@ -293,6 +311,55 @@ PROC average_4_color_res
 	ret
 ENDP average_4_color_res
 
+PROC vec3_in_unit_sphere
+	;Uses: Rejection sampling
+	;      https://en.wikipedia.org/wiki/Rejection_sampling#Examples
+	ARG @@VEC3_PTR:dword
+	USES eax, ebx
+@@try_again:
+	mov eax, [@@VEC3_PTR]
+	;lea overbodig
+	call random_float_0_1, eax
+	lea ebx, [eax + vec3.y]
+	call random_float_0_1, ebx
+	lea ebx, [eax + vec3.z]
+	call random_float_0_1, ebx
+
+	;Check
+	sub esp, 4
+	mov ebx, esp
+	;call print_vec3_x1000, eax
+	;call print_vec3, eax
+	call vec3_dot, eax, eax, ebx
+	call print_rounded_floatx1000, [ebx]
+	fld1
+	fcomp ST(1) 
+	                    ;compare the value of ST(0) to +0.0
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe @@error_handler     ;the comparison was indeterminate
+					    ;this condition should be verified first
+					    ;then only two of the next three conditional jumps
+					    ;should become necessary, in whatever order is preferred,
+					    ;the third jump being replaced by code to handle that case
+	;ja   st0_positive   ;when all flags are 0
+	;jb   st0_negative   ;only the C0 bit (CF flag) would be set if no error
+	;jz   st0_zero       ;only the C3 bit (ZF flag) would be set if no error
+	ja @@try_again
+	add esp, 4
+	
+	
+@@error_handler:
+	mov ah, 09h
+	mov edx, offset msg_comparison_was_indeterminate
+	int 21h
+	
+	ret
+ENDP vec3_in_unit_sphere
+
+
 DATASEG
 	nr_4 dd 4.0
+	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$';
 END

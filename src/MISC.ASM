@@ -15,6 +15,8 @@ MODEL FLAT, C
 ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
 INCLUDE "MISC.INC"
+INCLUDE "RAND.INC"
+
 
 ; -------------------------------------------------------------------
 ; CODE
@@ -136,6 +138,23 @@ PROC print_rounded_float
 	ret
 ENDP print_rounded_float
 
+PROC print_rounded_floatx1000
+	ARG @@var:dword
+	uses eax, ebx
+	
+	fld [@@var]
+	fld [dword offset nr_1000]
+	fmulp
+	sub esp, 4
+	mov ebx, esp
+
+	fistp [dword ebx]
+	call print_int, [dword ebx]
+	
+	add esp, 4
+	ret
+ENDP print_rounded_floatx1000
+
 	;-----
 	; PRINT
 	; prints a var on the stack
@@ -240,7 +259,37 @@ PROC terminate_process
 	ret
 ENDP terminate_process
 
+;generates a random float between -1 and 1
+PROC random_float_n1_1
+	ARG @@DEST_FLOAT_PTR:dword
+	USES eax
+	call rand
+	push eax
+	fild [dword esp]
+	fcos
+	mov eax, [dword @@DEST_FLOAT_PTR]
+	fstp [dword eax]
+	pop eax
+	ret
+ENDP
+
+;generates a random float between -1 and 1
+PROC random_float_0_1
+	ARG @@DEST_FLOAT_PTR:dword
+	USES eax, ebx
+	call rand
+	push eax
+	mov ebx, esp
+	fild [dword ebx]
+	fcos
+	fabs
+	mov eax, [dword @@DEST_FLOAT_PTR]
+	fstp [dword eax]
+	pop eax
+	ret
+ENDP
+
 DATASEG
     msg_end         db 13, 10, '$'; 13, 10 == carrige return & \n
-
+	nr_1000 dd 1000.0
 END

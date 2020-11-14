@@ -19,7 +19,7 @@ INCLUDE "STRUC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "VEC.INC"
 INCLUDE "RAYTRACE.INC"
-
+INCLUDE "RAND.INC"
 
 ; -------------------------------------------------------------------
 ; CODE
@@ -47,16 +47,24 @@ rep stosb
 	add eax, RAY_SIZE
 	mov ebx, esp
 	
-	mov ecx, [offset nr_four]
-	mov [eax + vec3.x], ecx
-	mov [eax + vec3.y], ecx
-	mov [eax + vec3.z], ecx
+	;mov ecx, [offset nr_four]
+	;mov [eax + vec3.x], ecx
+	;mov [eax + vec3.y], ecx
+	;mov [eax + vec3.z], ecx
+	;
+	;call print_vec3, eax
+	;
+	;call vec3_normalize_dest, eax, ebx
+	;call vec3_mul_float_res, ebx, [offset nr_10000], ebx
+	;call print_vec3, ebx
 	
-	call print_vec3, eax
+	call random_float_0_1, ebx
+	call print_rounded_floatx1000, [dword ebx]
+	;call vec3_in_unit_sphere, ebx
+	;call print_vec3, ebx
+	;call vec3_mul_float_res, ebx, [offset nr_10000], ebx
+	;call print_vec3, ebx
 	
-	call vec3_normalize_dest, eax, ebx
-	call vec3_mul_float_res, ebx, [offset nr_10000], ebx
-	call print_vec3, ebx
 	
 	mov	ah,00h
 	int	16h
@@ -128,6 +136,7 @@ PROC main
 	push ds
 	pop	es
 	finit
+	call rand_init
 	
 	;call test_place
 	
