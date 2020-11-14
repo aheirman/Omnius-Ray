@@ -19,6 +19,7 @@ INCLUDE "STRUC.INC"
 INCLUDE "VEC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
+INCLUDE "FILE.INC"
 
 ; compile-time constants (with macros)
 VMEMADR   EQU 0A0000h	; video memory address
@@ -490,8 +491,9 @@ ENDP intersect_objects
 
 PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
-	LOCAL @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword, @@TMP_VAR:dword
-	USES eax, ebx, ecx, edx, edi, esi, edi
+	LOCAL @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword,\
+	      @@TMP_VAR:dword, @@TMP_VAR_2:dword, @@TMP_VEC3_1:vec3, @@TMP_VEC3_2:vec3
+	USES eax, ebx, ecx, edx, esi, edi
 	
 	mov [dword @@SUBPIXEL_X], 0
 	mov [dword @@SUBPIXEL_Y], 0
@@ -595,11 +597,11 @@ rep stosb
 	mov  [dword @@TMP_VAR], SCRHEIGHT
 	fild [dword @@TMP_VAR]
 	fdivp
-	fld [dword offset nr_neg_half]
+	fld  [dword offset nr_neg_half]
 	faddp
 	; Voor orthonormaal gebruik deze
 	;fst  [dword ebx + ray_obj.origin_y]
-	fst  [dword ebx + ray_obj.direction_y]
+	fstp [dword ebx + ray_obj.direction_y]
 
 	;---
 	; Intersect
@@ -624,6 +626,12 @@ rep stosb
 	mov edi, eax
 	add edi, offset pixel_samples
 
+	;---
+	; Check voor een hit
+	;    hit:    kleur van de ray
+	;    no-hit: background
+	;---
+
 	xor eax, eax
 	mov al, [byte ebx + ray_obj.hit]
 	cmp eax, 0
@@ -638,10 +646,30 @@ rep stosb
 
 	jmp @@post_hit
 @@no_hit:
-	mov [edi + vec3.x],  0
-	mov [edi + vec3.y],  0
-	mov [edi + vec3.z],  0
+
+	;---
+	; Background color
+	;---
+	fld [dword ebx + ray_obj.direction_y]; De y-component is nu geschaald van -1 tot 1
+	fld1
+	faddp
+	fld [dword offset nr_background]
+	fmulp;                                 De y-component is nu geschaald van 0 tot 1
+	fst [dword @@TMP_VAR]
+	fld1
+	fsubrp st(1), st(0)
+	fstp [dword @@TMP_VAR_2]
+	lea eax, [@@TMP_VEC3_1]
+	lea ecx, [@@TMP_VEC3_2]
+	call vec3_mul_float_res, offset background_colors,             [dword @@TMP_VAR],   eax
+	call vec3_mul_float_res, offset background_colors + VEC3_SIZE, [dword @@TMP_VAR_2], ecx
+	
+	call vec3_add_res, eax, ecx, edi
+	;mov [edi + vec3.x],  0
+	;mov [edi + vec3.y],  0
+	;mov [edi + vec3.z],  0
 @@post_hit:
+
 
 	;---
 	; Subpixel loops
@@ -659,9 +687,17 @@ rep stosb
 	;---
 	; Averaged Color
 	;---
-	mov eax, offset pixel_samples
-	call average_4_color_res, eax, eax
+	mov edi, offset pixel_samples
+	call average_4_color_res, edi, edi
 	
+	;---
+	; Prepare to put pixel in pixel row
+	;---
+	mov eax, [dword @@PIXEL_X]
+	mov edx, BYTE_VEC3_SIZE
+	imul edx
+	add eax, offset pixel_row
+	mov ecx, eax
 	
 	;---
 	; Get Color using: eax, edx
@@ -682,13 +718,12 @@ rep stosb
 	fistp [dword esp]
 	mov edx, [dword esp]
 	;call print_int, edx
-
-	
 	cmp edx, 255
 	jl @@not_cliping_r
 	;call print_endl
 	mov edx, 255
 @@not_cliping_r:
+	mov [byte ecx + byte_vec3.z], dl
 	and edx, 224; 3 bovenste bits
 	;call print_int, edx
 	add eax, edx
@@ -704,6 +739,7 @@ rep stosb
 	;call print_endl
 	mov edx, 255
 @@not_cliping_g:
+	mov [byte ecx + byte_vec3.y], dl
 	and edx, 224
 	;call print_int, edx
 	shr edx, 3
@@ -720,6 +756,7 @@ rep stosb
 	mov edx, 255
 	;call print_endl
 @@not_cliping_b:
+	mov [byte ecx + byte_vec3.x], dl
 	and edx, 224
 	;call print_int, edx
 	shr edx, 6
@@ -740,6 +777,7 @@ rep stosb
 	cmp ecx, SCRWIDTH
 	jnz @@begin_width_loop
 	
+	call write_row, offset pixel_row
 	
 	mov ecx, [dword @@PIXEL_Y]
 	inc ecx
@@ -758,6 +796,7 @@ DATASEG
 	nr_aspect_ratio   dd 1.2
 	nr_1              dd 1.0
 	nr_half           dd 0.5
+	nr_background     dd 0.5
 	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
@@ -772,4 +811,8 @@ DATASEG
 	
 	pixel_samples vec3 4 DUP(?)
 	
+	background_colors vec3 <0.097, 0.118, 0.205>, <0.877, 0.579, 0.437>
+
+UDATASEG
+	pixel_row db NUM_PIXEL_ROW_BYTES dup (?)
 END

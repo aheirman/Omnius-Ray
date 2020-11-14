@@ -20,6 +20,7 @@ INCLUDE "VIDEO.INC"
 INCLUDE "VEC.INC"
 INCLUDE "RAYTRACE.INC"
 INCLUDE "RAND.INC"
+INCLUDE "FILE.INC"
 
 ; -------------------------------------------------------------------
 ; CODE
@@ -127,6 +128,14 @@ rep stosb
 	call terminate_process
 ENDP test_place_2
 
+PROC test_place_3
+
+	
+	
+	mov	ah,00h
+	int	16h
+	call terminate_process
+ENDP test_place_3
 
 PROC main
 	sti
@@ -135,9 +144,10 @@ PROC main
 	push ds
 	pop	es
 	finit
+	
 	call rand_init
 	
-	call test_place
+	call create_bmp
 	
 	call	setVideoMode,13h
 	

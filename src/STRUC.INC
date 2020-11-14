@@ -8,6 +8,14 @@ STRUC vec3
 	z    dd 0.0
 ENDS
 
+;Size: 3 bytes  = 3 bytes
+BYTE_VEC3_SIZE EQU 3
+STRUC byte_vec3
+	x    db 0
+	y    db 0
+	z    db 0
+ENDS
+
 ;Size: 10*4ytes + 2 bytes = 42 bytes
 RAY_SIZE           EQU 42
 RAY_DIR_OFFSET     EQU 12; 3*4

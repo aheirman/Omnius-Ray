@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Settings - Edit the names of the object and executable files.
-objects1 = RAND.OBJ misc.obj vec.obj video.obj raytrace.obj main.obj 
+objects1 = RAND.OBJ misc.obj vec.obj file.obj video.obj raytrace.obj main.obj 
 dest = PROJ.exe
 
 # =============================================================================
