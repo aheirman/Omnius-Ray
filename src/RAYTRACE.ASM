@@ -24,6 +24,9 @@ INCLUDE "MISC.INC"
 VMEMADR   EQU 0A0000h	; video memory address
 SCRWIDTH  EQU 320	; screen witdth
 SCRHEIGHT EQU 200	; screen height
+
+NUM_SUB_PIXELS          EQU 4
+NUM_SUB_PIXELS_PER_AXIS EQU 2
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -135,6 +138,7 @@ PROC intersect_sphere
 	; Based on:
 	; http://viclw17.github.io/2018/07/16/raytracing-ray-sphere-intersection/
 	; float info: http://www.ray.masmcode.com/tutorial/fpuchap7.htm#ftst
+	;             https://home.deec.uc.pt/~jlobo/tc/artofasm/ch14/ch144.htm#HEADING4-118
 	ARG @@sphere_ptr:dword, @@ray_ptr:dword, @@next_ray_ptr:dword
 	LOCAL @@vec3_normal:vec3, @@vec3_tmp:vec3
 	uses eax, ebx, ecx, edx, edi, esi
@@ -371,7 +375,7 @@ rep stosb
 	;call print_vec3, ecx
 	;call print_vec3, eax
 	;call print_vec3, ebx
-	mov edx, [dword ptr @@vec3_normal]
+	lea edx, [@@vec3_normal]
 	call vec3_normalize_dest, ebx, edx
 	
 
@@ -488,7 +492,13 @@ ENDP intersect_objects
 
 PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
-	USES eax, ebx, ecx, edx, edi, esi
+	LOCAL @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword, @@TMP_VAR:dword
+	USES eax, ebx, ecx, edx, edi, esi, edi
+	
+	mov [dword @@SUBPIXEL_X], 0
+	mov [dword @@SUBPIXEL_Y], 0
+	mov [dword @@PIXEL_X], 0
+	mov [dword @@PIXEL_Y], 0
 	
 	mov ebx, esp
 	mov ecx, @@LOCAL_STACK_SIZE; DO NOT OPTIMIZE AWAY, IT IS ENEDED FOT THE ZERO INITIALIZE
@@ -513,15 +523,19 @@ rep stosb
 	xor esi, esi
 	mov esi, 0a0000h
 
-
 @@begin_height_loop:
-	mov [esp+8], ecx
+	mov [dword @@PIXEL_Y], ecx
 	xor ecx, ecx
-@@begin_wirdth_loop:
-
-
-@@begin_height_AA_loop:
-
+@@begin_width_loop:
+	mov [dword @@PIXEL_X], ecx
+	xor ecx, ecx
+@@begin_SUBPIXEL_Y_loop:
+	mov [dword @@SUBPIXEL_Y], ecx
+	xor ecx, ecx
+@@begin_SUBPIXEL_X_loop:
+	mov [dword @@SUBPIXEL_X], ecx
+	xor ecx, ecx
+	
 	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
 	fld1
 	fldz
@@ -543,11 +557,19 @@ rep stosb
 	fld1
 	fstp [dword ebx + ray_obj.direction_z]
 	
+
+	;---
+	; X-location
+	;---
+	fild [dword @@PIXEL_X]
+	fild [dword @@SUBPIXEL_X]
+	mov  [dword @@TMP_VAR], NUM_SUB_PIXELS_PER_AXIS
+	fild [dword @@TMP_VAR]
+	fdivp
+	faddp
 	
-	mov [dword esp], ecx
-	mov [dword esp+4], SCRWIDTH
-	fld [dword esp]
-	fld [dword esp+4]
+	mov  [dword @@TMP_VAR], SCRWIDTH
+	fild [dword @@TMP_VAR]
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
@@ -561,11 +583,19 @@ rep stosb
 	; Voor orthonormaal gebruik deze
 	;fstp  [dword ebx + ray_obj.origin_x]
 	
-	mov edi, [esp+8]; ecx of outerloop
-	mov [dword esp], edi
-	mov [dword esp+4], SCRHEIGHT
-	fld [dword esp]
-	fld [dword esp+4]
+	;---
+	; Y-location
+	;--- 
+	fild [dword @@PIXEL_Y]
+	fild [dword @@SUBPIXEL_Y]
+	mov  [dword @@TMP_VAR], NUM_SUB_PIXELS_PER_AXIS
+	fild [dword @@TMP_VAR]
+	fdivp
+	faddp
+	
+	
+	mov  [dword @@TMP_VAR], SCRHEIGHT
+	fild [dword @@TMP_VAR]
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
@@ -573,17 +603,67 @@ rep stosb
 	;fst  [dword ebx + ray_obj.origin_y]
 	fst  [dword ebx + ray_obj.direction_y]
 
-	;call print_ray, ebx
-	
-	;call print_int, ebx
+	;---
+	; Intersect
+	;---
 	call intersect_objects, ebx
 	;call print_ray, ebx
 	;--
 
+
+	
+
+	
+	;---
+	; Sla kleur op
+	;---
+	mov ecx, [dword @@SUBPIXEL_X]
+	mov edx, [dword @@SUBPIXEL_Y]
+	lea edx, [ecx + edx*NUM_SUB_PIXELS_PER_AXIS]
+	;call print_int, edx
+	mov eax, VEC3_SIZE
+	imul edx;                                      maakt de eax = arrayindex
+	mov edi, eax
+	add edi, offset pixel_samples
+
 	xor eax, eax
-	mov al, [ebx + ray_obj.hit]
+	mov al, [byte ebx + ray_obj.hit]
 	cmp eax, 0
 	jz @@no_hit
+
+	mov ecx, [dword ebx + ray_obj.color_r]
+	mov [edi + vec3.x],  ecx
+	mov ecx, [dword ebx + ray_obj.color_g]
+	mov [edi + vec3.y],  ecx
+	mov ecx, [dword ebx + ray_obj.color_b]
+	mov [edi + vec3.z],  ecx
+
+	jmp @@post_hit
+@@no_hit:
+	mov [edi + vec3.x],  0
+	mov [edi + vec3.y],  0
+	mov [edi + vec3.z],  0
+@@post_hit:
+
+	;---
+	; Subpixel loops
+	;---
+	mov ecx, [dword @@SUBPIXEL_X]
+	inc ecx
+	cmp ecx, NUM_SUB_PIXELS_PER_AXIS
+	jnz @@begin_SUBPIXEL_X_loop
+	
+	mov ecx, [dword @@SUBPIXEL_Y]
+	inc ecx
+	cmp ecx, NUM_SUB_PIXELS_PER_AXIS
+	jnz @@begin_SUBPIXEL_Y_loop
+
+	;---
+	; Averaged Color
+	;---
+	mov eax, offset pixel_samples
+	call average_4_color_res, eax, eax
+	
 	
 	;---
 	; Get Color using: eax, edx
@@ -591,11 +671,11 @@ rep stosb
 	;Bit    7  6  5  4  3  2  1  0
 	;Data   R  R  R  G  G  G  B  B
 	xor eax, eax; Will be used as the packed color
-	
+	mov edi, offset pixel_samples
 	fld [dword offset nr_max_byte_float]
-	fld [dword ebx + ray_obj.color_b]
-	fld [dword ebx + ray_obj.color_g]
-	fld [dword ebx + ray_obj.color_r]
+	fld [dword edi + vec3.z]
+	fld [dword edi + vec3.y]
+	fld [dword edi + vec3.x]
 	
 	;---
 	;red
@@ -648,23 +728,22 @@ rep stosb
 	add eax, edx
 	;--------------------
 	; End of color
-	;--------------------
-	
-	
+	;--------------------	
 	mov [dword esi], eax
-	jmp @@after_hit
-@@no_hit:
-	mov [dword esi], 0
-@@after_hit:
 	
-	
-	inc esi
+
+
+	;---
+	; Pixel loops
+	;---
+	inc esi; video geheugen adress
+	mov ecx, [dword @@PIXEL_X]
 	inc ecx
 	cmp ecx, SCRWIDTH
-	jnz @@begin_wirdth_loop
+	jnz @@begin_width_loop
 	
 	
-	mov ecx, [esp+8]
+	mov ecx, [dword @@PIXEL_Y]
 	inc ecx
 	cmp ecx, SCRHEIGHT
 	jnz @@begin_height_loop
@@ -693,6 +772,6 @@ DATASEG
 	                        <0.2,  0.0, 0.7, 0.1, 0.0, 1.0, 0.0, 1>,\
 	                        <0.0,  0.0, 2.0, 1.0, 0.0, 0.0, 1.0, 1>
 	
-	pixel_samples vec3  4 DUP(?)
+	pixel_samples vec3 4 DUP(?)
 	
 END

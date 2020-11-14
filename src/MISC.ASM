@@ -165,23 +165,23 @@ PROC print_int_eax
 	; Sign
 	;----
 	and eax, 80000000h
-	jnz negative
+	jnz @@negative
 	
 	mov ah, 02h
 	mov edx, '+'
 	int 21h
-	jmp end_negative
-negative:
+	jmp @@end_negative
+@@negative:
 	mov ah, 02h
 	mov edx, '-'
 	int 21h
 	not esi
 	add esi, 1
-end_negative:
+@@end_negative:
 	
-beg_calc_char:
+@@beg_calc_char:
 	sub edi, 1
-	jz end_calc_char
+	jz @@end_calc_char
 
 	xor edx, edx
 	mov EBX, 10
@@ -193,21 +193,21 @@ beg_calc_char:
 
 	push edx
 
-	jmp beg_calc_char
-end_calc_char:
+	jmp @@beg_calc_char
+@@end_calc_char:
 
 	mov edi, 10
-beg_print_char:
+@@beg_print_char:
 	sub edi, 1
-	jz end_print_char
+	jz @@end_print_char
 	
 	mov ah, 02h
 	pop edx
 	add edx, '0'
 	int 21h
 	
-	jmp beg_print_char
-end_print_char:
+	jmp @@beg_print_char
+@@end_print_char:
 
 	mov ah, 02h
 	mov edx, ','

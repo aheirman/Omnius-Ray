@@ -212,8 +212,8 @@ PROC vec3_normalize_dest
 	ARG @@VEC3_PTR:dword, @@res_ptr:dword
 	USES eax, ecx
 	
-	mov eax, [@@VEC3_PTR]
-	mov ecx, [@@res_ptr]
+	mov eax, [dword @@VEC3_PTR]
+	mov ecx, [dword @@res_ptr]
 	
 	fld [eax + vec3.x]
 	fld [eax + vec3.x]
@@ -249,8 +249,8 @@ PROC vec3_normalize_dest
 	ret
 ENDP vec3_normalize_dest
 
-;WARNING: POINTERS MAY NOT OVERLAP
-PROC average_color_res
+;NOTE: POINTERS MAY OVERLAP
+PROC average_4_color_res
 	ARG @@VEC3_ARRAY_PTR:dword, @@res_ptr:dword
 	USES eax, ecx
 	
@@ -291,7 +291,7 @@ PROC average_color_res
 	fstp [ecx + vec3.z]
 	
 	ret
-ENDP average_color_res
+ENDP average_4_color_res
 
 DATASEG
 	nr_4 dd 4.0
