@@ -58,12 +58,11 @@ rep stosb
 	;call vec3_mul_float_res, ebx, [offset nr_10000], ebx
 	;call print_vec3, ebx
 	
-	call random_float_0_1, ebx
-	call print_rounded_floatx1000, [dword ebx]
-	;call vec3_in_unit_sphere, ebx
+	;call random_float_0_1, ebx
+	;call print_rounded_floatx1000, [dword ebx]
+	call vec3_in_unit_sphere, ebx
 	;call print_vec3, ebx
-	;call vec3_mul_float_res, ebx, [offset nr_10000], ebx
-	;call print_vec3, ebx
+	;call print_vec3_x1000, ebx
 	
 	
 	mov	ah,00h
@@ -138,7 +137,7 @@ PROC main
 	finit
 	call rand_init
 	
-	;call test_place
+	call test_place
 	
 	call	setVideoMode,13h
 	

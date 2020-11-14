@@ -27,6 +27,7 @@ SCRHEIGHT EQU 200	; screen height
 
 NUM_SUB_PIXELS          EQU 4
 NUM_SUB_PIXELS_PER_AXIS EQU 2
+MAX_BOUNCES             EQU 2
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -384,26 +385,23 @@ rep stosb
 	; DEBUG: kleur op basis van normaal
 	; pseudo code: 0.5*vec3(N.x()+1, N.y()+1, N.z()+1);
 	;----
-	mov eax, ecx
-	add eax, RAY_COL_OFFSET
-	mov esi, [dword offset nr_1]
-	call vec3_add_float_res, edx, esi, ebx
-	mov esi, [dword offset nr_half]
-	call vec3_mul_float_res, ebx, esi, eax
-	;call print_vec3, edx
-	;call print_vec3, ebx
-	;call print_vec3, eax
+	;mov eax, ecx
+	;add eax, RAY_COL_OFFSET
+	;mov esi, [dword offset nr_1]
+	;call vec3_add_float_res, edx, esi, ebx
+	;mov esi, [dword offset nr_half]
+	;call vec3_mul_float_res, ebx, esi, eax
 
 	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	;mov eax, [@@sphere_ptr]
-	;fld  [eax + sphere_obj.color_r]
-	;fstp [ecx + ray_obj.color_r]
-	;fld  [eax + sphere_obj.color_g]
-	;fstp [ecx + ray_obj.color_g]
-	;fld  [eax + sphere_obj.color_b]
-	;fstp [ecx + ray_obj.color_b]
+	mov eax, [@@sphere_ptr]
+	fld  [eax + sphere_obj.color_r]
+	fstp [ecx + ray_obj.color_r]
+	fld  [eax + sphere_obj.color_g]
+	fstp [ecx + ray_obj.color_g]
+	fld  [eax + sphere_obj.color_b]
+	fstp [ecx + ray_obj.color_b]
 	
 
 

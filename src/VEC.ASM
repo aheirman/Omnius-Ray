@@ -214,11 +214,11 @@ PROC print_vec3_x1000
 	mov eax, [@@vec_ptr]
 
 	
-	call print_rounded_floatx1000, [eax]
+	call print_rounded_floatx1000, [dword eax]
 	lea ecx, [eax + vec3.y]
-	call print_rounded_floatx1000, [ecx]
+	call print_rounded_floatx1000, [dword ecx]
 	lea ecx, [eax + vec3.z]
-	call print_rounded_floatx1000, [ecx]
+	call print_rounded_floatx1000, [dword ecx]
 	
 	call print_endl
 
@@ -315,25 +315,33 @@ PROC vec3_in_unit_sphere
 	;Uses: Rejection sampling
 	;      https://en.wikipedia.org/wiki/Rejection_sampling#Examples
 	ARG @@VEC3_PTR:dword
-	USES eax, ebx
-@@try_again:
+	USES eax, ebx, ecx, edx
 	mov eax, [@@VEC3_PTR]
-	;lea overbodig
-	call random_float_0_1, eax
-	lea ebx, [eax + vec3.y]
-	call random_float_0_1, ebx
-	lea ebx, [eax + vec3.z]
-	call random_float_0_1, ebx
 
-	;Check
 	sub esp, 4
 	mov ebx, esp
+	xor ecx, ecx
+	
+@@try_again:
+
+	cmp ecx, 20
+	jg @@error_handler_many
+	inc ecx
+
+	;lea overbodig
+	call random_float_0_1, eax
+	lea edx, [eax + vec3.y]
+	call random_float_0_1, edx
+	lea edx, [eax + vec3.z]
+	call random_float_0_1, edx
+
 	;call print_vec3_x1000, eax
 	;call print_vec3, eax
 	call vec3_dot, eax, eax, ebx
-	call print_rounded_floatx1000, [ebx]
+	;call print_rounded_floatx1000, [dword ebx]
+	fld [dword ebx]
 	fld1
-	fcomp ST(1) 
+	fcompp ST(1)
 	                    ;compare the value of ST(0) to +0.0
 	fstsw ax            ;copy the Status Word containing the result to AX
 	fwait               ;insure the previous instruction is completed
@@ -346,15 +354,19 @@ PROC vec3_in_unit_sphere
 	;ja   st0_positive   ;when all flags are 0
 	;jb   st0_negative   ;only the C0 bit (CF flag) would be set if no error
 	;jz   st0_zero       ;only the C3 bit (ZF flag) would be set if no error
-	ja @@try_again
-	add esp, 4
+	jb	@@try_again
 	
-	
+	jmp @@return
 @@error_handler:
 	mov ah, 09h
 	mov edx, offset msg_comparison_was_indeterminate
 	int 21h
-	
+@@error_handler_many:
+	mov ah, 09h
+	mov edx, offset msg_too_many_attempts
+	int 21h
+@@return:
+	add esp, 4
 	ret
 ENDP vec3_in_unit_sphere
 
@@ -362,4 +374,5 @@ ENDP vec3_in_unit_sphere
 DATASEG
 	nr_4 dd 4.0
 	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$';
+	msg_too_many_attempts            db "Too many attempts were necessary to find a proper vector using the rejection method", 13, 10, '$';
 END
