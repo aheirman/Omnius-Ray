@@ -21,11 +21,9 @@ INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
 
 ; compile-time constants (with macros)
-VMEMADR EQU 0A0000h	; video memory address
-SCRWIDTH EQU  320	; screen witdth
+VMEMADR   EQU 0A0000h	; video memory address
+SCRWIDTH  EQU 320	; screen witdth
 SCRHEIGHT EQU 200	; screen height
-
-
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -367,19 +365,41 @@ rep stosb
 	; Bereken de normaal
 	; pseudo code: normalize(nieuwe_origin-sphere_center)
 	;-------
-	;mov [@@vec3_tmp]
+	lea ebx, [@@vec3_tmp];  Dit zal de ongenormaliseerde normaal zijn.
+	mov eax, [@@sphere_ptr];          ptr naar sphere, het eerste is de origin
+	call vec3_sub_res, ecx, eax, ebx; links, rechts, ptr
+	;call print_vec3, ecx
+	;call print_vec3, eax
+	;call print_vec3, ebx
+	mov edx, [dword ptr @@vec3_normal]
+	call vec3_normalize_dest, ebx, edx
 	
+
+
+	;----
+	; DEBUG: kleur op basis van normaal
+	; pseudo code: 0.5*vec3(N.x()+1, N.y()+1, N.z()+1);
+	;----
+	mov eax, ecx
+	add eax, RAY_COL_OFFSET
+	mov esi, [dword offset nr_1]
+	call vec3_add_float_res, edx, esi, ebx
+	mov esi, [dword offset nr_half]
+	call vec3_mul_float_res, ebx, esi, eax
+	;call print_vec3, edx
+	;call print_vec3, ebx
+	;call print_vec3, eax
 
 	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	mov eax, [@@sphere_ptr]
-	fld  [eax + sphere_obj.color_r]
-	fstp [ecx + ray_obj.color_r]
-	fld  [eax + sphere_obj.color_g]
-	fstp [ecx + ray_obj.color_g]
-	fld  [eax + sphere_obj.color_b]
-	fstp [ecx + ray_obj.color_b]
+	;mov eax, [@@sphere_ptr]
+	;fld  [eax + sphere_obj.color_r]
+	;fstp [ecx + ray_obj.color_r]
+	;fld  [eax + sphere_obj.color_g]
+	;fstp [ecx + ray_obj.color_g]
+	;fld  [eax + sphere_obj.color_b]
+	;fstp [ecx + ray_obj.color_b]
 	
 
 
@@ -470,9 +490,7 @@ PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
 	USES eax, ebx, ecx, edx, edi, esi
 	
-	push ebp
-	mov ebp, esp
-	
+	mov ebx, esp
 	mov ecx, @@LOCAL_STACK_SIZE; DO NOT OPTIMIZE AWAY, IT IS ENEDED FOT THE ZERO INITIALIZE
 	sub esp, ecx
 	; store one ray
@@ -490,7 +508,6 @@ rep stosb
 	;call print_byte_list, RAY_SIZE + VEC3_SIZE + 4, esp
 	;--------
 	
-	mov ebx, ebp
 	sub ebx, RAY_SIZE
 
 	xor esi, esi
@@ -501,6 +518,9 @@ rep stosb
 	mov [esp+8], ecx
 	xor ecx, ecx
 @@begin_wirdth_loop:
+
+
+@@begin_height_AA_loop:
 
 	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
 	fld1
@@ -522,6 +542,7 @@ rep stosb
 
 	fld1
 	fstp [dword ebx + ray_obj.direction_z]
+	
 	
 	mov [dword esp], ecx
 	mov [dword esp+4], SCRWIDTH
@@ -649,7 +670,6 @@ rep stosb
 	jnz @@begin_height_loop
 	
 	add esp, @@LOCAL_STACK_SIZE
-	pop ebp
 	ret
 ENDP ray_trace
 
@@ -660,6 +680,7 @@ DATASEG
 	nr_neg_half       dd -0.5
 	nr_aspect_ratio   dd 1.2
 	nr_1              dd 1.0
+	nr_half           dd 0.5
 	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
@@ -670,6 +691,8 @@ DATASEG
 	num_spheres  dd 3
 	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 1.0, 0.0, 0.0, 1>,\
 	                        <0.2,  0.0, 0.7, 0.1, 0.0, 1.0, 0.0, 1>,\
-	                        <0.0,  0.0, 0.7, 0.1, 0.0, 0.0, 1.0, 1>
-
+	                        <0.0,  0.0, 2.0, 1.0, 0.0, 0.0, 1.0, 1>
+	
+	pixel_samples vec3  4 DUP(?)
+	
 END

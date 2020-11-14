@@ -15,6 +15,7 @@ MODEL FLAT, C
 ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
 INCLUDE "MISC.INC"
+INCLUDE "STRUC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "VEC.INC"
 INCLUDE "RAYTRACE.INC"
@@ -46,12 +47,79 @@ CODESEG
 ;	add eax, RAY_SIZE
 ;	mov ebx, esp
 ;	
-;	mov [dword eax + 
+;	mov ecx, [offset nr_four]
+;	mov [eax + vec3.x], ecx
+;	mov [eax + vec3.y], ecx
+;	mov [eax + vec3.z], ecx
 ;	
-;	call normalize_vec3_dest, eax, ebx
+;	call print_vec3, eax
 ;	
+;	call vec3_normalize_dest, eax, ebx
+;	call vec3_mul_float_res, ebx, [offset nr_10000], ebx
+;	call print_vec3, ebx
+;	
+;	mov	ah,00h
+;	int	16h
 ;	call terminate_process
-;ENDP
+;ENDP test_place
+
+;PROC test_place_2
+;@@LOCAL_STACK_SIZE EQU VEC3_SIZE
+;	uses eax, ebx, ecx, edx, edi
+;	
+;	push ebp
+;	mov ebp, esp
+;	
+;	mov ecx, @@LOCAL_STACK_SIZE
+;	sub esp, ecx
+;	;----------
+;	; Zero initialize
+;	xor eax, eax
+;	cld
+;	mov edi, esp
+;rep stosb
+;	;----------
+;	
+;	mov eax, offset pixel_samples
+;	mov ecx, [offset nr_four]
+;	mov [eax + vec3.x], ecx
+;	mov [eax + vec3.y], ecx
+;	mov [eax + vec3.z], ecx
+;	call print_vec3, eax
+;
+;	lea ebx, [offset pixel_samples + VEC3_SIZE]
+;	mov ecx, [offset nr_four]
+;	mov [ebx + vec3.x], ecx
+;	mov [ebx + vec3.y], ecx
+;	mov [ebx + vec3.z], ecx
+;	call print_vec3, ebx
+;
+;	lea ebx, [offset pixel_samples + 2*VEC3_SIZE]
+;	mov ecx, [offset nr_two]
+;	mov [ebx + vec3.x], ecx
+;	mov [ebx + vec3.y], ecx
+;	mov [ebx + vec3.z], ecx
+;	call print_vec3, ebx
+;
+;	lea ebx, [offset pixel_samples + 3*VEC3_SIZE]
+;	mov ecx, [offset nr_two]
+;	mov [ebx + vec3.x], ecx
+;	mov [ebx + vec3.y], ecx
+;	mov [ebx + vec3.z], ecx
+;	call print_vec3, ebx
+;
+;	mov edx, esp
+;	call average_color_res, eax, edx
+;	call print_vec3, edx
+;
+;	call vec3_mul_float_res, edx, [dword offset nr_10], edx
+;	call print_vec3, edx
+;	
+;	mov	ah,00h
+;	int	16h
+;	call terminate_process
+;ENDP test_place_2
+
 
 PROC main
 	sti
@@ -60,6 +128,8 @@ PROC main
 	push ds
 	pop	es
 	finit
+	
+	;call test_place_2
 	
 	call	setVideoMode,13h
 	
@@ -91,10 +161,16 @@ ENDP main
 ; DATA
 ; -------------------------------------------------------------------
 DATASEG
+	nr_four           dd 4.0
+	nr_two            dd 2.0
+	nr_10000 dd 10000.0
+
+	nr_10    dd 10.0
+	pixel_samples vec3  4 DUP(?)
 
 ; -------------------------------------------------------------------
 ; STACK
 ; -------------------------------------------------------------------
-STACK 300h; 100 bytes groot
+STACK 400h; 100 bytes groot
 
 END main

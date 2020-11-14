@@ -75,9 +75,36 @@ PROC vec3_add_res
 ENDP vec3_add_res
 
 ;IMPORTANT: ptrs may aliase (That's good) :)
+PROC vec3_add_float_res
+	ARG @@VEC3_PTR:dword, @@FLOAT:dword, @@res_ptr:dword
+	USES eax, ecx
+	
+	mov eax, [@@VEC3_PTR]
+	mov ecx, [@@res_ptr]
+	
+	fld [eax + vec3.x]
+	fld [@@FLOAT]
+	faddp
+	fstp [ecx + vec3.x]
+	
+	fld [eax + vec3.y]
+	fld [@@FLOAT]
+	faddp
+	fstp [ecx + vec3.y]
+	
+	fld [eax + vec3.z]
+	fld [@@FLOAT]
+	faddp
+	fstp [ecx + vec3.z]
+	
+	ret
+ENDP vec3_add_float_res
+
+
+;IMPORTANT: ptrs may aliase (That's good) :)
 PROC vec3_mul_float_res
 	ARG @@VEC3_PTR:dword, @@multiplier:dword, @@res_ptr:dword
-	USES eax, ebx, ecx
+	USES eax, ecx
 	
 	push [@@multiplier]
 	
@@ -86,17 +113,17 @@ PROC vec3_mul_float_res
 	
 	fld [dword eax + vec3.x]
 	fld [dword esp]
-	faddp
+	fmulp
 	fstp [ecx + vec3.x]
 	
 	fld [dword  eax + vec3.y]
 	fld [dword  esp]
-	faddp
+	fmulp
 	fstp [ecx + vec3.y]
 	
 	fld [dword eax + vec3.z]
 	fld [dword esp]
-	faddp
+	fmulp
 	fstp [ecx + vec3.z]
 	
 	pop eax; dummie
@@ -180,9 +207,10 @@ PROC print_vec3
 	ret
 ENDP print_vec3
 
-PROC normalize_vec3_dest
+;IMPORTANT: ptrs may aliase (That's good) :)
+PROC vec3_normalize_dest
 	ARG @@VEC3_PTR:dword, @@res_ptr:dword
-	USES eax, ebx, ecx
+	USES eax, ecx
 	
 	mov eax, [@@VEC3_PTR]
 	mov ecx, [@@res_ptr]
@@ -213,14 +241,58 @@ PROC normalize_vec3_dest
 	fstp [ecx + vec3.y]
 	fst st
 	
-	fld [eax + vec3.y]
+	fld [eax + vec3.z]
 	fdiv st, st(1)
-	fstp [ecx + vec3.y]
+	fstp [ecx + vec3.z]
 	fst st
 	
 	ret
-ENDP normalize_vec3_dest
+ENDP vec3_normalize_dest
+
+;WARNING: POINTERS MAY NOT OVERLAP
+PROC average_color_res
+	ARG @@VEC3_ARRAY_PTR:dword, @@res_ptr:dword
+	USES eax, ecx
+	
+	mov eax, [@@VEC3_ARRAY_PTR]
+	mov ecx, [@@res_ptr]
+	
+	fld [eax + vec3.x]
+	fld [eax + VEC3_SIZE + vec3.x]
+	fld [eax + 2*VEC3_SIZE + vec3.x]
+	fld [eax + 3*VEC3_SIZE + vec3.x]
+	faddp
+	faddp
+	faddp
+	fld [dword offset nr_4]
+	fdivp st(1), st(0)
+	fstp [ecx + vec3.x]
+	
+	fld [eax + vec3.y]
+	fld [eax + VEC3_SIZE + vec3.y]
+	fld [eax + 2*VEC3_SIZE + vec3.y]
+	fld [eax + 3*VEC3_SIZE + vec3.y]
+	faddp
+	faddp
+	faddp
+	fld [dword offset nr_4]
+	fdivp st(1), st(0)
+	fstp [ecx + vec3.y]
+	
+	fld [eax + vec3.z]
+	fld [eax + VEC3_SIZE + vec3.z]
+	fld [eax + 2*VEC3_SIZE + vec3.z]
+	fld [eax + 3*VEC3_SIZE + vec3.z]
+	faddp
+	faddp
+	faddp
+	fld [dword offset nr_4]
+	fdivp st(1), st(0)
+	fstp [ecx + vec3.z]
+	
+	ret
+ENDP average_color_res
 
 DATASEG
-
+	nr_4 dd 4.0
 END
