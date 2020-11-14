@@ -120,16 +120,26 @@ ENDP
 ; Thus, if there us no hit, the next_ray will not be updated.
 ;--
 PROC intersect_sphere
-@@LOCAL_STACK_SIZE EQU (4*6)  + VEC3_SIZE*1
+@@LOCAL_NUM_DWORD equ 6
+@@LOCAL_STACK_SIZE EQU (4* @@LOCAL_NUM_DWORD )  + VEC3_SIZE*1
 	; "4 +", ik wil dat esp wijst naar de volgende cel.
-	; 5 floats a,b,c, discriminant, de lengte, en de ptr naar de sphere
+	; floats: 5
+	;   a,b,c
+	;	discriminant, 
+	;	de lengte,
+	; ptrs: 1
+	;   naar de sphere
+	; NOTE: de volgende worden van de argument gehouden:
+	;	de ptr naar next_ray
+	;
 	; one vec3: oc
 	
 	; Based on:
 	; http://viclw17.github.io/2018/07/16/raytracing-ray-sphere-intersection/
 	; float info: http://www.ray.masmcode.com/tutorial/fpuchap7.htm#ftst
 	ARG @@sphere_ptr:dword, @@ray_ptr:dword, @@next_ray_ptr:dword
-	uses eax, ebx, ecx, edx, edi
+	LOCAL @@vec3_normal:vec3, @@vec3_tmp:vec3
+	uses eax, ebx, ecx, edx, edi, esi
 	
 	
 
@@ -157,7 +167,6 @@ rep stosb
 	;call print_byte_list, 35, edi
 	;--------------
 	
-
 	
 	
 	mov eax, ebx; =[@@ray_ptr]
@@ -167,13 +176,10 @@ rep stosb
 	mov ebx, ebp
 	sub ebx, 4*6
 	mov [ebx], edx; =[@@sphere_ptr]
-	;call print_int, ebx
-	;call print_int, [ebx]
 	;call print_sphere, edx
-	;call print_sphere, [ebx]
-
+	
 	mov ecx, ebp
-	sub ecx, 4*6 + VEC3_SIZE*1; point to the vector
+	sub ecx, 4*@@LOCAL_NUM_DWORD + VEC3_SIZE*1; point to the vector
 	
 
 	
@@ -181,7 +187,7 @@ rep stosb
 	; vec3 oc = r.origin() - center;
 	; eax: origin is het eerste deel van de ray
 	; ebx: origin is het eerste deel van de sphere
-	call vec3_sub_res, eax, [ebx], ecx
+	call vec3_sub_res, eax, [dword ebx], ecx
 	
 	;------------------------
 	;  float a = dot(r.direction(), r.direction());
@@ -309,7 +315,7 @@ rep stosb
 	mov [byte ebx + ray_obj.hit], 1
 	
 	;----
-	; bereken de afstand
+	; bereken de afstand: Passes float through
 	;----
 	fchs
 	fld [dword offset nr_two]
@@ -336,21 +342,44 @@ rep stosb
 	
 	fstp [ebx + ray_obj.depth]; Update the ray-depth
 	
+	;---
+	; Zet de nieuwe origin
+	; pseudo code: nieuwe_origin = oude_origin + oude_direction * t;
+	;---
+	; ebx: ptr naar ray
+	mov ebp, [esp + @@LOCAL_STACK_SIZE]; Zet ebp terug goed
+	mov ecx, [@@next_ray_ptr]
+	
+	mov esi, [ebx + ray_obj.depth]; lengte
+	add ebx, RAY_DIR_OFFSET
+	add ecx, RAY_DIR_OFFSET
+	call vec3_mul_float_res, ebx, esi, ecx; ptr1, float --> nieuwe ptr in direction (tijdelijk)
+	sub ebx, RAY_DIR_OFFSET
+	mov esi, ecx
+	sub ecx, RAY_DIR_OFFSET
+	; esi: tijdelijke vec, ebx origin ptr oud --> ecx: origin nieuw
+	call vec3_add_res, esi, ebx, ecx
+	
+	;call print_ray, ebx
+	;call print_ray, ecx
+	
+	;-------
+	; Bereken de normaal
+	; pseudo code: normalize(nieuwe_origin-sphere_center)
+	;-------
+	;mov [@@vec3_tmp]
+	
+
 	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	mov eax, ebp
-	sub eax, 4*6
-	mov eax, [eax]
-	;call print_int, eax
-	;call print_int, [eax]
-	;call print_sphere, eax
+	mov eax, [@@sphere_ptr]
 	fld  [eax + sphere_obj.color_r]
-	fstp [ebx + ray_obj.color_r]
+	fstp [ecx + ray_obj.color_r]
 	fld  [eax + sphere_obj.color_g]
-	fstp [ebx + ray_obj.color_g]
+	fstp [ecx + ray_obj.color_g]
 	fld  [eax + sphere_obj.color_b]
-	fstp [ebx + ray_obj.color_b]
+	fstp [ecx + ray_obj.color_b]
 	
 
 
@@ -370,8 +399,11 @@ rep stosb
 	;int 21h
 	
 @@finish:
+
 	add esp, @@LOCAL_STACK_SIZE
-	pop ebp
+	mov ebp, [esp]
+	add esp, 4
+	
 	ret
 ENDP intersect_sphere
 
@@ -405,13 +437,22 @@ rep stosb
 	
 	;call print_sphere, eax
 	mov edx, esp; ptr naar de nieuwe ray
-	call intersect_sphere, eax, ebx, edx
+	call intersect_sphere, eax, ebx, edx; eax: spehre; ebx: ray; edx: next ray
 	dec ecx
 	add eax, SPHERE_SIZE
 	jmp @@loop_begin
 @@finish:
 
-	; TODO move new ray into old ray
+
+	;---
+	; Move color of the final ray in the argument ray.
+	;---
+	mov eax, [edx + ray_obj.color_r]
+	mov [ebx + ray_obj.color_r], eax
+	mov eax, [edx + ray_obj.color_g]
+	mov [ebx + ray_obj.color_g], eax
+	mov eax, [edx + ray_obj.color_b]
+	mov [ebx + ray_obj.color_b], eax
 
 	add esp, @@LOCAL_STACK_SIZE
 	pop ebp

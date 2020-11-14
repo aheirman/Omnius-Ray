@@ -16,13 +16,42 @@ ASSUME cs:_TEXT,ds:FLAT,es:FLAT,fs:FLAT,gs:FLAT
 
 INCLUDE "MISC.INC"
 INCLUDE "VIDEO.INC"
+INCLUDE "VEC.INC"
 INCLUDE "RAYTRACE.INC"
+
 
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
 CODESEG
 
+;PROC test_place
+;@@LOCAL_STACK_SIZE EQU 2*RAY_SIZE
+;	uses eax, ebx, ecx, edx, edi
+;	
+;	push ebp
+;	mov ebp, esp
+;	
+;	mov ecx, @@LOCAL_STACK_SIZE
+;	sub esp, ecx
+;	;----------
+;	; Zero initialize
+;	xor eax, eax
+;	cld
+;	mov edi, esp
+;rep stosb
+;	;----------
+;	
+;	mov eax, esp
+;	add eax, RAY_SIZE
+;	mov ebx, esp
+;	
+;	mov [dword eax + 
+;	
+;	call normalize_vec3_dest, eax, ebx
+;	
+;	call terminate_process
+;ENDP
 
 PROC main
 	sti

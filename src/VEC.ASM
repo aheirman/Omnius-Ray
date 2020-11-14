@@ -74,7 +74,8 @@ PROC vec3_add_res
 	ret
 ENDP vec3_add_res
 
-PROC vec_3_mul_float_res
+;IMPORTANT: ptrs may aliase (That's good) :)
+PROC vec3_mul_float_res
 	ARG @@VEC3_PTR:dword, @@multiplier:dword, @@res_ptr:dword
 	USES eax, ebx, ecx
 	
@@ -101,7 +102,33 @@ PROC vec_3_mul_float_res
 	pop eax; dummie
 	
 	ret
-ENDP vec_3_mul_float_res
+ENDP vec3_mul_float_res
+
+;IMPORTANT: vec ptrs may aliase (That's good) :)
+;PROC vec_3_mul_float_ptr_res
+;	ARG @@VEC3_PTR:dword, @@multiplier_ptr:dword, @@res_ptr:dword
+;	USES eax, ebx, ecx
+;	
+;	mov eax, [@@VEC3_PTR]
+;	mov ecx, [@@res_ptr]
+;	
+;	fld [dword eax + vec3.x]
+;	fld [dword @@multiplier_ptr]
+;	faddp
+;	fstp [ecx + vec3.x]
+;	
+;	fld [dword  eax + vec3.y]
+;	fld [dword @@multiplier_ptr]
+;	faddp
+;	fstp [ecx + vec3.y]
+;	
+;	fld [dword eax + vec3.z]
+;	fld [dword @@multiplier_ptr]
+;	faddp
+;	fstp [ecx + vec3.z]
+;
+;	ret
+;ENDP vec_3_mul_float_ptr_res
 
 ;IMPORTANT: ptrs may aliase (That's good) :)
 PROC vec3_dot
@@ -153,7 +180,7 @@ PROC print_vec3
 	ret
 ENDP print_vec3
 
-PROC normalize_vec3
+PROC normalize_vec3_dest
 	ARG @@VEC3_PTR:dword, @@res_ptr:dword
 	USES eax, ebx, ecx
 	
@@ -176,20 +203,23 @@ PROC normalize_vec3
 	faddp
 	fsqrt; lengte
 	
-	;TODO fix
-	;fld [eax + vec3.x]
-	;fdivp st, st(1)
-	;fstp [ecx + vec3.x]
-	;
-	;fld [eax + vec3.y]
-	;fdivp st, st(1)
-	;fstp [ecx + vec3.y]
-	;
-	;fld [eax + vec3.y]
-	;fdivp st, st(1)
-	;fstp [ecx + vec3.y]
+	fld [eax + vec3.x]
+	fdiv st, st(1)
+	fstp [ecx + vec3.x]
+	fst st
+	
+	fld [eax + vec3.y]
+	fdiv st, st(1)
+	fstp [ecx + vec3.y]
+	fst st
+	
+	fld [eax + vec3.y]
+	fdiv st, st(1)
+	fstp [ecx + vec3.y]
+	fst st
+	
 	ret
-ENDP normalize_vec3
+ENDP normalize_vec3_dest
 
 DATASEG
 
