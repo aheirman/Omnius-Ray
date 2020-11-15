@@ -29,20 +29,20 @@ PROC vec3_sub_res
 	mov ebx, [@@VEC3_PTR_rechts]
 	mov ecx, [@@res_ptr]
 	
-	fld [eax + vec3.x]
-	fld [ebx + vec3.x]
+	fld [dword eax + vec3.x]
+	fld [dword ebx + vec3.x]
 	fsubp
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	
-	fld [eax + vec3.y]
-	fld [ebx + vec3.y]
+	fld [dword eax + vec3.y]
+	fld [dword ebx + vec3.y]
 	fsubp
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	
-	fld [eax + vec3.z]
-	fld [ebx + vec3.z]
+	fld [dword eax + vec3.z]
+	fld [dword ebx + vec3.z]
 	fsubp
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	
 	ret
 ENDP vec3_sub_res
@@ -56,20 +56,20 @@ PROC vec3_add_res
 	mov ebx, [@@VEC3_PTR_rechts]
 	mov ecx, [@@res_ptr]
 	
-	fld [eax + vec3.x]
-	fld [ebx + vec3.x]
+	fld [dword eax + vec3.x]
+	fld [dword ebx + vec3.x]
 	faddp
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	
-	fld [eax + vec3.y]
-	fld [ebx + vec3.y]
+	fld [dword eax + vec3.y]
+	fld [dword ebx + vec3.y]
 	faddp
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	
-	fld [eax + vec3.z]
-	fld [ebx + vec3.z]
+	fld [dword eax + vec3.z]
+	fld [dword ebx + vec3.z]
 	faddp
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	
 	ret
 ENDP vec3_add_res
@@ -82,20 +82,20 @@ PROC vec3_add_float_res
 	mov eax, [@@VEC3_PTR]
 	mov ecx, [@@res_ptr]
 	
-	fld [eax + vec3.x]
-	fld [@@FLOAT]
+	fld  [dword eax + vec3.x]
+	fld  [dword @@FLOAT]
 	faddp
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	
-	fld [eax + vec3.y]
-	fld [@@FLOAT]
+	fld  [dword eax + vec3.y]
+	fld  [dword @@FLOAT]
 	faddp
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	
-	fld [eax + vec3.z]
-	fld [@@FLOAT]
+	fld  [dword eax + vec3.z]
+	fld  [dword @@FLOAT]
 	faddp
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	
 	ret
 ENDP vec3_add_float_res
@@ -111,20 +111,20 @@ PROC vec3_mul_float_res
 	mov eax, [@@VEC3_PTR]
 	mov ecx, [@@res_ptr]
 	
-	fld [dword eax + vec3.x]
-	fld [dword esp]
+	fld  [dword eax + vec3.x]
+	fld  [dword esp]
 	fmulp
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	
-	fld [dword  eax + vec3.y]
-	fld [dword  esp]
+	fld  [dword  eax + vec3.y]
+	fld  [dword  esp]
 	fmulp
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	
-	fld [dword eax + vec3.z]
-	fld [dword esp]
+	fld  [dword eax + vec3.z]
+	fld  [dword esp]
 	fmulp
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	
 	pop eax; dummie
 	
@@ -233,35 +233,35 @@ PROC vec3_normalize_dest
 	mov eax, [dword @@VEC3_PTR]
 	mov ecx, [dword @@res_ptr]
 	
-	fld [eax + vec3.x]
-	fld [eax + vec3.x]
+	fld [dword eax + vec3.x]
+	fld [dword eax + vec3.x]
 	fmulp
 	
-	fld [eax + vec3.y]
-	fld [eax + vec3.y]
+	fld [dword eax + vec3.y]
+	fld [dword eax + vec3.y]
 	fmulp
 	
-	fld [eax + vec3.z]
-	fld [eax + vec3.z]
+	fld [dword eax + vec3.z]
+	fld [dword eax + vec3.z]
 	fmulp
 	
 	faddp
 	faddp
 	fsqrt; lengte
 	
-	fld [eax + vec3.x]
+	fld [dword eax + vec3.x]
 	fdiv st, st(1)
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	fst st
 	
-	fld [eax + vec3.y]
+	fld [dword eax + vec3.y]
 	fdiv st, st(1)
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	fst st
 	
-	fld [eax + vec3.z]
+	fld [dword eax + vec3.z]
 	fdiv st, st(1)
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	fst st
 	
 	ret
@@ -275,38 +275,38 @@ PROC average_4_color_res
 	mov eax, [@@VEC3_ARRAY_PTR]
 	mov ecx, [@@res_ptr]
 	
-	fld [eax + vec3.x]
-	fld [eax + VEC3_SIZE + vec3.x]
-	fld [eax + 2*VEC3_SIZE + vec3.x]
-	fld [eax + 3*VEC3_SIZE + vec3.x]
+	fld [dword eax + vec3.x]
+	fld [dword eax + VEC3_SIZE + vec3.x]
+	fld [dword eax + 2*VEC3_SIZE + vec3.x]
+	fld [dword eax + 3*VEC3_SIZE + vec3.x]
 	faddp
 	faddp
 	faddp
 	fld [dword offset nr_4]
 	fdivp st(1), st(0)
-	fstp [ecx + vec3.x]
+	fstp [dword ecx + vec3.x]
 	
-	fld [eax + vec3.y]
-	fld [eax + VEC3_SIZE + vec3.y]
-	fld [eax + 2*VEC3_SIZE + vec3.y]
-	fld [eax + 3*VEC3_SIZE + vec3.y]
+	fld [dword eax + vec3.y]
+	fld [dword eax + VEC3_SIZE + vec3.y]
+	fld [dword eax + 2*VEC3_SIZE + vec3.y]
+	fld [dword eax + 3*VEC3_SIZE + vec3.y]
 	faddp
 	faddp
 	faddp
 	fld [dword offset nr_4]
 	fdivp st(1), st(0)
-	fstp [ecx + vec3.y]
+	fstp [dword ecx + vec3.y]
 	
-	fld [eax + vec3.z]
-	fld [eax + VEC3_SIZE + vec3.z]
-	fld [eax + 2*VEC3_SIZE + vec3.z]
-	fld [eax + 3*VEC3_SIZE + vec3.z]
+	fld [dword eax + vec3.z]
+	fld [dword eax + VEC3_SIZE + vec3.z]
+	fld [dword eax + 2*VEC3_SIZE + vec3.z]
+	fld [dword eax + 3*VEC3_SIZE + vec3.z]
 	faddp
 	faddp
 	faddp
 	fld [dword offset nr_4]
 	fdivp st(1), st(0)
-	fstp [ecx + vec3.z]
+	fstp [dword ecx + vec3.z]
 	
 	ret
 ENDP average_4_color_res
@@ -315,8 +315,8 @@ PROC vec3_in_unit_sphere
 	;Uses: Rejection sampling
 	;      https://en.wikipedia.org/wiki/Rejection_sampling#Examples
 	ARG @@VEC3_PTR:dword
-	USES eax, ebx, ecx, edx
-	mov eax, [@@VEC3_PTR]
+	USES eax, ebx, ecx, edx, esi
+	mov esi, [@@VEC3_PTR]
 
 	sub esp, 4
 	mov ebx, esp
@@ -324,20 +324,20 @@ PROC vec3_in_unit_sphere
 	
 @@try_again:
 
-	cmp ecx, 20
+	cmp ecx, 1000
 	jg @@error_handler_many
 	inc ecx
 
 	;lea overbodig
-	call random_float_0_1, eax
-	lea edx, [eax + vec3.y]
+	call random_float_0_1, esi
+	lea edx, [esi + vec3.y]
 	call random_float_0_1, edx
-	lea edx, [eax + vec3.z]
+	lea edx, [esi + vec3.z]
 	call random_float_0_1, edx
 
 	;call print_vec3_x1000, eax
 	;call print_vec3, eax
-	call vec3_dot, eax, eax, ebx
+	call vec3_dot, esi, esi, ebx
 	;call print_rounded_floatx1000, [dword ebx]
 	fld [dword ebx]
 	fld1
@@ -361,10 +361,18 @@ PROC vec3_in_unit_sphere
 	mov ah, 09h
 	mov edx, offset msg_comparison_was_indeterminate
 	int 21h
+
+	mov	ah,00h
+	int	16h
+	call terminate_process
 @@error_handler_many:
 	mov ah, 09h
 	mov edx, offset msg_too_many_attempts
 	int 21h
+	
+	mov	ah,00h
+	int	16h
+	call terminate_process
 @@return:
 	add esp, 4
 	ret

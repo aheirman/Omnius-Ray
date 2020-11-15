@@ -144,8 +144,6 @@ PROC intersect_sphere
 	ARG @@sphere_ptr:dword, @@ray_ptr:dword, @@next_ray_ptr:dword
 	LOCAL @@vec3_normal:vec3, @@vec3_tmp:vec3
 	uses eax, ebx, ecx, edx, edi, esi
-	
-	
 
 	mov ebx, [@@ray_ptr]; Curses this depends on the current state of the ebp
 	;call print_int, ebx
@@ -380,6 +378,15 @@ rep stosb
 	lea edx, [@@vec3_normal]
 	call vec3_normalize_dest, ebx, edx
 	
+	;-------
+	; Bereken de next direction via Lambertian reflectance
+	; pseudo code: Next ray.dir = normal + vec3_in_unit_sphere
+	;-------
+	lea ebx, [@@vec3_tmp]
+	call vec3_in_unit_sphere, ebx
+	;lea esi, [ecx + ray_obj.direction_x]
+	;call vec3_add_res, ebx, edx, esi
+
 
 
 	;----
@@ -394,15 +401,36 @@ rep stosb
 	;call vec3_mul_float_res, ebx, esi, eax
 
 	;----
+	; Geef de kleur van objecten
+	;----
+	;mov eax, [@@sphere_ptr]
+	;fld  [dword eax + sphere_obj.color_r]
+	;fstp [dword ecx + ray_obj.color_r]
+	;fld  [dword eax + sphere_obj.color_g]
+	;fstp [dword ecx + ray_obj.color_g]
+	;fld  [dword eax + sphere_obj.color_b]
+	;fstp [dword ecx + ray_obj.color_b]
+
+	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	mov eax, [@@sphere_ptr]
-	fld  [eax + sphere_obj.color_r]
-	fstp [ecx + ray_obj.color_r]
-	fld  [eax + sphere_obj.color_g]
-	fstp [ecx + ray_obj.color_g]
-	fld  [eax + sphere_obj.color_b]
-	fstp [ecx + ray_obj.color_b]
+	mov eax, [dword @@sphere_ptr];      eax: sphere
+	mov esi, [dword @@ray_ptr];         esi: oude ray
+	;                             ecx: nieuwe ray	
+	fld  [dword eax + sphere_obj.color_r]
+	fld  [dword esi + ray_obj.color_r]
+	fmulp
+	fstp [dword ecx + ray_obj.color_r]
+	
+	fld  [dword eax + sphere_obj.color_g]
+	fld  [dword esi + ray_obj.color_g]
+	fmulp
+	fstp [dword ecx + ray_obj.color_g]
+	
+	fld  [dword eax + sphere_obj.color_b]
+	fld  [dword esi + ray_obj.color_b]
+	fmulp
+	fstp [dword ecx + ray_obj.color_b]
 	
 
 
@@ -432,24 +460,11 @@ ENDP intersect_sphere
 
 
 PROC intersect_objects
-@@LOCAL_STACK_SIZE EQU RAY_SIZE
 	; De nieuwe ray
 	ARG @@ray_ptr:dword
-	uses eax, ebx, ecx, edx, edi
-	mov ebx, [@@ray_ptr]
-	
-	push ebp
-	mov ebp, esp
-	
-	mov ecx, @@LOCAL_STACK_SIZE
-	sub esp, ecx
-	;----------
-	; Zero initialize
-	xor eax, eax
-	cld
-	mov edi, esp
-rep stosb
-	;----------
+	LOCAL @@RAY_TMP:ray_obj
+	uses eax, ebx, ecx, edx
+	mov ebx, [dword @@ray_ptr]
 	
 	mov ecx, [dword offset num_spheres]
 	mov eax, offset sphere_datas
@@ -457,9 +472,16 @@ rep stosb
 	cmp ecx, 0
 	je @@finish
 	
+	;----
+	; Zorg ervoor dat de kleur altijd klaar is voor de volgende 
+	;----
+	fld1
+	fst  [dword ebx + ray_obj.color_r]
+	fst  [dword ebx + ray_obj.color_g]
+	fstp [dword ebx + ray_obj.color_b]
 	
 	;call print_sphere, eax
-	mov edx, esp; ptr naar de nieuwe ray
+	lea edx, [@@RAY_TMP]; ptr naar de nieuwe ray
 	call intersect_sphere, eax, ebx, edx; eax: spehre; ebx: ray; edx: next ray
 	dec ecx
 	add eax, SPHERE_SIZE
@@ -470,15 +492,13 @@ rep stosb
 	;---
 	; Move color of the final ray in the argument ray.
 	;---
-	mov eax, [edx + ray_obj.color_r]
-	mov [ebx + ray_obj.color_r], eax
-	mov eax, [edx + ray_obj.color_g]
-	mov [ebx + ray_obj.color_g], eax
-	mov eax, [edx + ray_obj.color_b]
-	mov [ebx + ray_obj.color_b], eax
+	mov eax, [dword edx + ray_obj.color_r]
+	mov [dword ebx + ray_obj.color_r], eax
+	mov eax, [dword edx + ray_obj.color_g]
+	mov [dword ebx + ray_obj.color_g], eax
+	mov eax, [dword edx + ray_obj.color_b]
+	mov [dword ebx + ray_obj.color_b], eax
 
-	add esp, @@LOCAL_STACK_SIZE
-	pop ebp
 	ret
 ENDP intersect_objects
 
@@ -602,6 +622,15 @@ rep stosb
 	; Voor orthonormaal gebruik deze
 	;fst  [dword ebx + ray_obj.origin_y]
 	fstp [dword ebx + ray_obj.direction_y]
+
+	;---
+	; Zet de kleur multiplier naar 1.0, 1.0, 1.0
+	;--- 
+	mov ecx, [dword offset nr_1]
+	mov [dword ebx + ray_obj.color_r], ecx
+	mov [dword ebx + ray_obj.color_g], ecx
+	mov [dword ebx + ray_obj.color_b], ecx
+
 
 	;---
 	; Intersect
@@ -797,6 +826,7 @@ DATASEG
 	nr_1              dd 1.0
 	nr_half           dd 0.5
 	nr_background     dd 0.5
+	nr_zero           dd 0.0
 	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
@@ -809,7 +839,7 @@ DATASEG
 	                        <0.2,  0.0, 0.7, 0.1, 0.0, 1.0, 0.0, 1>,\
 	                        <0.0,  0.0, 2.0, 1.0, 0.0, 0.0, 1.0, 1>
 	
-	pixel_samples vec3 4 DUP(?)
+	pixel_samples vec3 4 DUP()
 	
 	background_colors vec3 <0.097, 0.118, 0.205>, <0.877, 0.579, 0.437>
 
