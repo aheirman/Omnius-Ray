@@ -144,28 +144,17 @@ PROC main
 	push ds
 	pop	es
 	finit
-	
 	call rand_init
 	
 	call create_bmp
 	
-	call	setVideoMode,13h
-	
-	
+	call setVideoMode,13h
 	call truecolor_palette
 	call updateColourPalette, 256
-	;call drawGradient_256
-	
-	;call	draw_triangle,60,60,60,60, 32
-	;call	draw_triangle,80,80,100,100, 63
-	;call	draw_triangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
-	
-	;call	draw_rectangle,60,60,60,60, 32
-	;call	draw_rectangle,80,80,100,100, 63
-	;call	draw_rectangle,1,1,SCRWIDTH-2,SCRHEIGHT-2, 48
 	
 	call ray_trace
 	
+	;call ray_info
 	
 	mov	ah,00h
 	int	16h

@@ -7,7 +7,8 @@ GLOBAL vec3_sub_res:PROC,\
 	   vec3_normalize_dest:PROC,\
 	   vec3_mul_float_res:PROC,\
 	   average_4_color_res:PROC,\
-	   vec3_in_unit_sphere:PROC
+	   vec3_in_unit_sphere:PROC,\
+	   vec3_mul_vec3_res:PROC
 	   
 	   
 	   

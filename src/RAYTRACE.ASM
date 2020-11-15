@@ -7,6 +7,7 @@
 ; date:         27/10/2020
 ; program:      Hello World!
 ; -------------------------------------------------------------------
+; Word art: https://patorjk.com/software/taag/#p=display&f=Ogre&t=intersect_sphere
 
 IDEAL
 P386
@@ -28,7 +29,7 @@ SCRHEIGHT EQU 200	; screen height
 
 NUM_SUB_PIXELS          EQU 4
 NUM_SUB_PIXELS_PER_AXIS EQU 2
-MAX_BOUNCES             EQU 2
+MAX_BOUNCES             EQU 10
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -39,30 +40,22 @@ CODESEG
 PROC print_ray
 	ARG @@ray_ptr:dword
 	uses eax, ebx, ecx
-	sub esp, 4
 	
 	;call print_int, eax
-	mov ecx, esp
 	mov eax, [@@ray_ptr]
-	fld [dword eax + ray_obj.origin_x]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + ray_obj.origin_y]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + ray_obj.origin_z]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
+
+	mov ecx, eax
+	call print_vec3_x1000, ecx
 	
-	fld [dword eax + ray_obj.direction_x]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + ray_obj.direction_y]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
-	fld [dword eax + ray_obj.direction_z]
-	fistp [dword ecx]
-	call print_int, [dword ecx]
+	mov ecx, eax
+	add ecx, RAY_DIR_OFFSET
+	call print_vec3_x1000, ecx
+	
+	mov ecx, eax
+	add ecx, RAY_COL_OFFSET
+	call print_vec3_x1000, ecx
+	
+	call print_rounded_floatx1000, [eax + ray_obj.depth]
 	
 	add eax, RAY_CONTROL_OFFSET
 	call print_byte_list, 1, eax
@@ -73,7 +66,6 @@ PROC print_ray
 	
 	
 	call print_endl
-	add esp, 4
 	ret
 ENDP print_ray
 
@@ -115,7 +107,17 @@ PROC print_sphere
 ENDP
 
 
-;--
+
+
+
+; _       _                          _                 _                   
+;(_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ _ __ | |__   ___ _ __ ___ 
+;| | '_ \| __/ _ \ '__/ __|/ _ \/ __| __|   / __| '_ \| '_ \ / _ \ '__/ _ \
+;| | | | | ||  __/ |  \__ \  __/ (__| |_    \__ \ |_) | | | |  __/ | |  __/
+;|_|_| |_|\__\___|_|  |___/\___|\___|\__|___|___/ .__/|_| |_|\___|_|  \___|
+;                                      |_____|  |_|                        
+;
+;
 ; This function automatically creates the next_ray IF
 ;   the next ray has a distance_traveled that is more than
 ;   the current distance between source and hit.
@@ -146,6 +148,7 @@ PROC intersect_sphere
 	uses eax, ebx, ecx, edx, edi, esi
 
 	mov ebx, [@@ray_ptr]; Curses this depends on the current state of the ebp
+	
 	;call print_int, ebx
 	;call print_endl
 	mov edx, [@@sphere_ptr]
@@ -344,6 +347,19 @@ rep stosb
 	
 	fstp [ebx + ray_obj.depth]; Update the ray-depth
 	
+	
+	;-------------
+	;--------------
+	; UPDATING RAY
+	;-------------
+	;-------------
+	
+	;mov ah, 09h
+	;mov edx, offset msg_updating_ray
+	;int 21h
+	
+	
+	
 	;---
 	; Zet de nieuwe origin
 	; pseudo code: nieuwe_origin = oude_origin + oude_direction * t;
@@ -354,16 +370,13 @@ rep stosb
 	
 	mov esi, [ebx + ray_obj.depth]; lengte
 	add ebx, RAY_DIR_OFFSET
-	add ecx, RAY_DIR_OFFSET
-	call vec3_mul_float_res, ebx, esi, ecx; ptr1, float --> nieuwe ptr in direction (tijdelijk)
-	sub ebx, RAY_DIR_OFFSET
-	mov esi, ecx
-	sub ecx, RAY_DIR_OFFSET
-	; esi: tijdelijke vec, ebx origin ptr oud --> ecx: origin nieuw
-	call vec3_add_res, esi, ebx, ecx
+	call vec3_mul_float_res, ebx, esi, ecx; sla direction*depth tijdelijk op in new origin
 	
-	;call print_ray, ebx
-	;call print_ray, ecx
+	sub ebx, RAY_DIR_OFFSET
+	; esi: tijdelijke vec, ebx origin ptr oud --> ecx: origin nieuw
+	call vec3_add_res, ebx, ecx, ecx
+	
+
 	
 	;-------
 	; Bereken de normaal
@@ -384,10 +397,11 @@ rep stosb
 	;-------
 	lea ebx, [@@vec3_tmp]
 	call vec3_in_unit_sphere, ebx
-	;lea esi, [ecx + ray_obj.direction_x]
-	;call vec3_add_res, ebx, edx, esi
+	mov esi, ecx
+	add esi, RAY_DIR_OFFSET
+	call vec3_add_res, ebx, edx, esi
 
-
+	;call print_ray, ecx
 
 	;----
 	; DEBUG: kleur op basis van normaal
@@ -432,7 +446,11 @@ rep stosb
 	fmulp
 	fstp [dword ecx + ray_obj.color_b]
 	
-
+	;DEBUG
+	;call print_ray, esi
+	;mov ebx, [@@next_ray_ptr]
+	;call print_ray, ebx
+	
 
 	jmp @@finish
 
@@ -459,60 +477,178 @@ rep stosb
 ENDP intersect_sphere
 
 
+
+;    _       _                          _            _     _           _       
+;   (_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ | |__ (_) ___  ___| |_ ___ 
+;   | | '_ \| __/ _ \ '__/ __|/ _ \/ __| __|   / _ \| '_ \| |/ _ \/ __| __/ __|
+;   | | | | | ||  __/ |  \__ \  __/ (__| |_   | (_) | |_) | |  __/ (__| |_\__ \
+;   |_|_| |_|\__\___|_|  |___/\___|\___|\__|___\___/|_.__// |\___|\___|\__|___/
+;                                         |_____|       |__/                   
+;   
+
 PROC intersect_objects
 	; De nieuwe ray
 	ARG @@ray_ptr:dword
-	LOCAL @@RAY_TMP:ray_obj
-	uses eax, ebx, ecx, edx
-	mov ebx, [dword @@ray_ptr]
+	LOCAL @@RAY_TMP:ray_obj, @@RAY_COUNTER:dword, @@TMP_VEC3_1:vec3, @@TMP_VEC3_2:vec3, @@TMP_VAR:dword, @@TMP_VAR_2:dword
+	uses eax, ebx, ecx, edx, esi
 	
-	mov ecx, [dword offset num_spheres]
-	mov eax, offset sphere_datas
-@@loop_begin:
-	cmp ecx, 0
-	je @@finish
+	mov ebx, [dword @@ray_ptr]
+	lea edx, [@@RAY_TMP];       ptr naar de nieuwe ray
 	
 	;----
 	; Zorg ervoor dat de kleur altijd klaar is voor de volgende 
 	;----
 	fld1
-	fst  [dword ebx + ray_obj.color_r]
-	fst  [dword ebx + ray_obj.color_g]
-	fstp [dword ebx + ray_obj.color_b]
+	fst  [dword edx + ray_obj.color_r]
+	fst  [dword edx + ray_obj.color_g]
+	fstp [dword edx + ray_obj.color_b]
+	
+	
+	mov ecx, MAX_BOUNCES
+@@ray_loop_begin:
+	mov [dword @@RAY_COUNTER], ecx
+	
+	mov ecx, [dword offset num_spheres]
+	mov eax, offset sphere_datas
+
+
+	;----
+	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
+	;----
+	fld1
+	fldz
+	fdivp
+	fstp [dword ebx + ray_obj.depth]
+	mov  [byte ebx + ray_obj.hit], 0
+	mov  [byte edx + ray_obj.hit], 0
+	
+@@object_loop_begin:
+	cmp ecx, 0
+	je @@object_loop_end
 	
 	;call print_sphere, eax
-	lea edx, [@@RAY_TMP]; ptr naar de nieuwe ray
-	call intersect_sphere, eax, ebx, edx; eax: spehre; ebx: ray; edx: next ray
+	;call print_ray, ebx
+	;call print_int, ebx
+	call intersect_sphere, eax, ebx, edx; eax: sphere
+    ;                                     ebx: ray
+	;                                     edx: next ray
+	;call print_int, 5
+
+	
+	
 	dec ecx
 	add eax, SPHERE_SIZE
-	jmp @@loop_begin
-@@finish:
-
+	jmp @@object_loop_begin
+@@object_loop_end:
+	;call print_int, 6
+	;call print_endl
+	;call print_ray, ebx
+	;call print_ray, edx
+	
+	;---
+	; Hebben we iets geraakt?
+	;    Indien ja: We kunnen verder loopen
+	;          nee: We moeten stoppen.
+	;                  --> Vemenig vuldig de begin ray met de background kleur.
+	;---
+	cmp [byte ebx + ray_obj.hit], 0
+	jz @@no_object_hit
 
 	;---
-	; Move color of the final ray in the argument ray.
+	; Move color of the next ray in the old ray.
 	;---
-	mov eax, [dword edx + ray_obj.color_r]
-	mov [dword ebx + ray_obj.color_r], eax
-	mov eax, [dword edx + ray_obj.color_g]
-	mov [dword ebx + ray_obj.color_g], eax
-	mov eax, [dword edx + ray_obj.color_b]
-	mov [dword ebx + ray_obj.color_b], eax
+	;mov eax, [dword edx + ray_obj.color_r]
+	;mov [dword ebx + ray_obj.color_r], eax
+	;mov eax, [dword edx + ray_obj.color_g]
+	;mov [dword ebx + ray_obj.color_g], eax
+	;mov eax, [dword edx + ray_obj.color_b]
+	;mov [dword ebx + ray_obj.color_b], eax
 
+
+
+	mov esi, ebx; switch rays
+	mov ebx, edx
+	mov edx, esi
+	
+	mov ecx, [dword @@RAY_COUNTER]
+	loop @@ray_loop_begin
+	jmp @@expended_ray_intersect_budget
+
+	;---
+	;We zijn in de buitenlucht
+	;---
+@@no_object_hit:
+	;---
+	; EDX: the old ray
+	;---
+	
+	;mov ah, 09h
+	;mov edx, offset msg_no_object_hit
+	;int 21h
+	
+	mov esi, [@@ray_ptr]
+	lea esi, [esi + RAY_COL_OFFSET]
+	;---
+	; Calculate background color
+	;---
+	fld [dword ebx + ray_obj.direction_y]; De y-component is nu geschaald van -1 tot 1
+	fld1
+	faddp
+	fld [dword offset nr_background]
+	fmulp;                                 De y-component is nu geschaald van 0 tot 1
+	fst [dword @@TMP_VAR]
+	fld1
+	fsubrp st(1), st(0)
+	fstp [dword @@TMP_VAR_2]
+	lea eax, [@@TMP_VEC3_1]
+	lea ecx, [@@TMP_VEC3_2]
+	call vec3_mul_float_res, offset background_colors,             [dword @@TMP_VAR],   eax
+	call vec3_mul_float_res, offset background_colors + VEC3_SIZE, [dword @@TMP_VAR_2], ecx
+	
+	call vec3_add_res, eax, ecx, eax
+	;mov [esi + vec3.x],  0
+	;mov [esi + vec3.y],  0
+	;mov [esi + vec3.z],  0
+	
+	;---
+	; Vermenigvuldig background color
+	;---
+	mov ecx, ebx
+	add ecx, RAY_COL_OFFSET
+	call vec3_mul_vec3_res, eax, ecx, esi
+	jmp @@end
+	
+	
+	;---
+	; We zitten in een loop vast
+	;---
+@@expended_ray_intersect_budget:
+	;mov ah, 09h
+	;mov edx, offset msg_expended_ray_intersect_budget
+	;int 21h
+	
+	mov esi, [@@ray_ptr]
+	lea esi, [esi + RAY_COL_OFFSET]
+	mov [esi + vec3.x],  0
+	mov [esi + vec3.y],  0
+	mov [esi + vec3.z],  0
+
+@@end:
 	ret
 ENDP intersect_objects
 
 
 
-
-;----------------------------------------------------------
-; ---------------------------- RAYTRACE -------------------
-;----------------------------------------------------------
+;     _ __ __ _ _   _   | |_ _ __ __ _  ___ ___ 
+;    | '__/ _` | | | |  | __| '__/ _` |/ __/ _ \
+;    | | | (_| | |_| |  | |_| | | (_| | (_|  __/
+;    |_|  \__,_|\__, |___\__|_|  \__,_|\___\___|
+;               |___/_____|                     
 
 PROC ray_trace
 @@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
 	LOCAL @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword,\
-	      @@TMP_VAR:dword, @@TMP_VAR_2:dword, @@TMP_VEC3_1:vec3, @@TMP_VEC3_2:vec3
+	      @@TMP_VAR:dword
 	USES eax, ebx, ecx, edx, esi, edi
 	
 	mov [dword @@SUBPIXEL_X], 0
@@ -556,12 +692,12 @@ rep stosb
 	mov [dword @@SUBPIXEL_X], ecx
 	xor ecx, ecx
 	
-	; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
-	fld1
-	fldz
-	fdivp
-	fstp [dword ebx + ray_obj.depth]
-	mov [byte ebx + ray_obj.hit], 0
+	;; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
+	;fld1
+	;fldz
+	;fdivp
+	;fstp [dword ebx + ray_obj.depth]
+	;mov [byte ebx + ray_obj.hit], 0
 	
 	
 	;fldz
@@ -626,10 +762,18 @@ rep stosb
 	;---
 	; Zet de kleur multiplier naar 1.0, 1.0, 1.0
 	;--- 
-	mov ecx, [dword offset nr_1]
-	mov [dword ebx + ray_obj.color_r], ecx
-	mov [dword ebx + ray_obj.color_g], ecx
-	mov [dword ebx + ray_obj.color_b], ecx
+	;mov ecx, [dword offset nr_1]
+	;mov [dword ebx + ray_obj.color_r], ecx
+	;mov [dword ebx + ray_obj.color_g], ecx
+	;mov [dword ebx + ray_obj.color_b], ecx
+
+	;----
+	; Zorg ervoor dat de kleur altijd klaar is voor de volgende 
+	;----
+	fld1
+	fst  [dword ebx + ray_obj.color_r]
+	fst  [dword ebx + ray_obj.color_g]
+	fstp [dword ebx + ray_obj.color_b]
 
 
 	;---
@@ -644,7 +788,7 @@ rep stosb
 
 	
 	;---
-	; Sla kleur op
+	; Sla kleur op in de pixel samples
 	;---
 	mov ecx, [dword @@SUBPIXEL_X]
 	mov edx, [dword @@SUBPIXEL_Y]
@@ -655,49 +799,12 @@ rep stosb
 	mov edi, eax
 	add edi, offset pixel_samples
 
-	;---
-	; Check voor een hit
-	;    hit:    kleur van de ray
-	;    no-hit: background
-	;---
-
-	xor eax, eax
-	mov al, [byte ebx + ray_obj.hit]
-	cmp eax, 0
-	jz @@no_hit
-
 	mov ecx, [dword ebx + ray_obj.color_r]
 	mov [edi + vec3.x],  ecx
 	mov ecx, [dword ebx + ray_obj.color_g]
 	mov [edi + vec3.y],  ecx
 	mov ecx, [dword ebx + ray_obj.color_b]
 	mov [edi + vec3.z],  ecx
-
-	jmp @@post_hit
-@@no_hit:
-
-	;---
-	; Background color
-	;---
-	fld [dword ebx + ray_obj.direction_y]; De y-component is nu geschaald van -1 tot 1
-	fld1
-	faddp
-	fld [dword offset nr_background]
-	fmulp;                                 De y-component is nu geschaald van 0 tot 1
-	fst [dword @@TMP_VAR]
-	fld1
-	fsubrp st(1), st(0)
-	fstp [dword @@TMP_VAR_2]
-	lea eax, [@@TMP_VEC3_1]
-	lea ecx, [@@TMP_VEC3_2]
-	call vec3_mul_float_res, offset background_colors,             [dword @@TMP_VAR],   eax
-	call vec3_mul_float_res, offset background_colors + VEC3_SIZE, [dword @@TMP_VAR_2], ecx
-	
-	call vec3_add_res, eax, ecx, edi
-	;mov [edi + vec3.x],  0
-	;mov [edi + vec3.y],  0
-	;mov [edi + vec3.z],  0
-@@post_hit:
 
 
 	;---
@@ -717,7 +824,7 @@ rep stosb
 	; Averaged Color
 	;---
 	mov edi, offset pixel_samples
-	call average_4_color_res, edi, edi
+	;call average_4_color_res, edi, edi
 	
 	;---
 	; Prepare to put pixel in pixel row
@@ -817,6 +924,67 @@ rep stosb
 	ret
 ENDP ray_trace
 
+
+;                         _        __       
+;     _ __ __ _ _   _    (_)_ __  / _| ___  
+;    | '__/ _` | | | |   | | '_ \| |_ / _ \ 
+;    | | | (_| | |_| |   | | | | |  _| (_) |
+;    |_|  \__,_|\__, |___|_|_| |_|_|  \___/ 
+;               |___/_____|               
+;    
+PROC ray_info
+	LOCAL @@TMP_RAY:ray_obj, @@PIXEL_X:dword, @@PIXEL_Y:dword
+	USES eax, ebx, ecx, edx, esi
+	
+	mov [dword @@PIXEL_X], 0
+	mov [dword @@PIXEL_Y], 0
+	lea ebx, [@@TMP_RAY]
+	
+	fldz
+	fst  [dword ebx + ray_obj.origin_x]
+	fst  [dword ebx + ray_obj.origin_y]
+	fstp  [dword ebx + ray_obj.origin_z]
+	
+
+	fld1
+	fstp [dword ebx + ray_obj.direction_z]
+	
+
+	;---
+	; X-location
+	;---
+	fild [dword @@PIXEL_Y]
+	fstp  [dword ebx + ray_obj.direction_x]
+	; Voor orthonormaal gebruik deze
+	;fstp  [dword ebx + ray_obj.origin_x]
+	
+	;---
+	; Y-location
+	;--- 
+	fild [dword @@PIXEL_Y]
+	fstp [dword ebx + ray_obj.direction_y]
+
+	;---
+	; Zet de kleur multiplier naar 1.0, 1.0, 1.0
+	;--- 
+	mov ecx, [dword offset nr_1]
+	mov [dword ebx + ray_obj.color_r], ecx
+	mov [dword ebx + ray_obj.color_g], ecx
+	mov [dword ebx + ray_obj.color_b], ecx
+
+
+	;---
+	; Intersect
+	;---
+	;call print_ray, ebx
+	call intersect_objects, ebx
+	;call print_ray, ebx
+	
+	ret
+ENDP ray_info
+
+
+
 DATASEG
 	nr_max_byte_float dd 255.0
 	nr_four           dd 4.0
@@ -831,18 +999,27 @@ DATASEG
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
 	
+	msg_expended_ray_intersect_budget db "expended_ray_intersect_budget", 13, 10, '$'
+	msg_no_object_hit                 db "no_object_hit", 13, 10, '$'
+	msg_updating_ray                  db "updating_ray", 13, 10, '$'
+	
 	;---
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 1.0, 0.0, 0.0, 1>,\
-	                        <0.2,  0.0, 0.7, 0.1, 0.0, 1.0, 0.0, 1>,\
-	                        <0.0,  0.0, 2.0, 1.0, 0.0, 0.0, 1.0, 1>
+	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.0, 0.0, 1>,\
+	                        <0.2,  0.0, 0.7, 0.1, 0.0, 0.5, 0.0, 1>,\
+	                        <0.0,  0.0, 2.0, 1.0, 0.5, 0.5, 0.5, 1>
+
+	;num_spheres  dd 1
+	;sphere_datas sphere_obj <0.0,  0.0, 3.0, 1.0, 1.0, 1.0, 1.0, 1>
 	
-	pixel_samples vec3 4 DUP()
+	pixel_samples vec3 4 DUP(?)
 	
 	background_colors vec3 <0.097, 0.118, 0.205>, <0.877, 0.579, 0.437>
-
+	;background_colors vec3 <1.0, 1.0, 1.0>, <0.5, 0.7, 1.0>
+	;background_colors vec3 <1.0, 1.0, 1.0>, <1.0, 1.0, 1.0>
+	;background_colors vec3 <0.0, 0.0, 0.0>, <1.0, 1.0, 1.0>
 UDATASEG
 	pixel_row db NUM_PIXEL_ROW_BYTES dup (?)
 END

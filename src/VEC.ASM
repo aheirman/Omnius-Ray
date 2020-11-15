@@ -211,7 +211,7 @@ PROC print_vec3_x1000
 	ARG @@vec_ptr:dword
 	uses eax, ecx
 	
-	mov eax, [@@vec_ptr]
+	mov eax, [dword @@vec_ptr]
 
 	
 	call print_rounded_floatx1000, [dword eax]
@@ -329,11 +329,11 @@ PROC vec3_in_unit_sphere
 	inc ecx
 
 	;lea overbodig
-	call random_float_0_1, esi
+	call random_float_n1_1, esi
 	lea edx, [esi + vec3.y]
-	call random_float_0_1, edx
+	call random_float_n1_1, edx
 	lea edx, [esi + vec3.z]
-	call random_float_0_1, edx
+	call random_float_n1_1, edx
 
 	;call print_vec3_x1000, eax
 	;call print_vec3, eax
@@ -378,6 +378,31 @@ PROC vec3_in_unit_sphere
 	ret
 ENDP vec3_in_unit_sphere
 
+PROC vec3_mul_vec3_res
+	ARG @@VEC3_PTR_1:dword, @@VEC3_PTR_2:dword, @@res_ptr:dword
+	USES eax, ebx, ecx
+	
+	mov eax, [dword @@VEC3_PTR_1]
+	mov ebx, [dword @@VEC3_PTR_2]
+	mov ecx, [dword @@res_ptr]
+	
+	fld  [dword eax + vec3.x]
+	fld  [dword ebx + vec3.x]
+	fmulp
+	fstp [dword ecx + vec3.x]
+	
+	fld  [dword eax + vec3.y]
+	fld  [dword ebx + vec3.y]
+	fmulp
+	fstp [dword ecx + vec3.y]
+	
+	fld  [dword eax + vec3.z]
+	fld  [dword ebx + vec3.z]
+	fmulp
+	fstp [dword ecx + vec3.z]
+
+	ret
+ENDP vec3_mul_vec3_res
 
 DATASEG
 	nr_4 dd 4.0
