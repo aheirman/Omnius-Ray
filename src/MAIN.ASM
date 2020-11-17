@@ -28,41 +28,22 @@ INCLUDE "FILE.INC"
 CODESEG
 
 PROC test_place
-@@LOCAL_STACK_SIZE EQU 2*RAY_SIZE
+	LOCAL @@v_tmp1:vec3, @@v_tmp2:vec3, @@tmp1:dword
 	uses eax, ebx, ecx, edx, edi
 	
-	push ebp
-	mov ebp, esp
+	lea eax, [@@v_tmp1]
+	mov ecx, [offset nr_1]
+	mov [eax + vec3.x], ecx
+	mov [eax + vec3.y], ecx
+	mov [eax + vec3.z], ecx
 	
-	mov ecx, @@LOCAL_STACK_SIZE
-	sub esp, ecx
-	;----------
-	; Zero initialize
-	xor eax, eax
-	cld
-	mov edi, esp
-rep stosb
-	;----------
 	
-	mov eax, esp
-	add eax, RAY_SIZE
-	mov ebx, esp
-	
-	;mov ecx, [offset nr_four]
-	;mov [eax + vec3.x], ecx
-	;mov [eax + vec3.y], ecx
-	;mov [eax + vec3.z], ecx
-	;
-	;call print_vec3, eax
-	;
-	;call vec3_normalize_dest, eax, ebx
-	;call vec3_mul_float_res, ebx, [offset nr_10000], ebx
-	;call print_vec3, ebx
-	
-	;call random_float_0_1, ebx
-	;call print_rounded_floatx1000, [dword ebx]
-	call vec3_in_unit_sphere, ebx
-	;call print_vec3, ebx
+	mov ecx, [offset nr_four]
+	lea ebx, [@@v_tmp2]
+	call vec3_in_unit_hemisphere, eax, ecx, ebx
+	call print_vec3_x1000, ebx
+	call print_int, ebx
+	;call vec3_neg, ebx
 	;call print_vec3_x1000, ebx
 	
 	
@@ -146,6 +127,8 @@ PROC main
 	finit
 	call rand_init
 	
+	;call test_place
+	
 	call create_bmp
 	
 	call setVideoMode,13h
@@ -170,6 +153,7 @@ ENDP main
 DATASEG
 	nr_four           dd 4.0
 	nr_two            dd 2.0
+	nr_1            dd 1.0
 	nr_10000 dd 10000.0
 
 	nr_10    dd 10.0

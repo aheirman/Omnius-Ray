@@ -60,11 +60,6 @@ PROC print_ray
 	add eax, RAY_CONTROL_OFFSET
 	call print_byte_list, 1, eax
 	
-	;call print_vec3, eax
-	;add eax, RAY_DIR_OFFSET
-	;call print_vec3, eax
-	
-	
 	call print_endl
 	ret
 ENDP print_ray
@@ -393,10 +388,14 @@ rep stosb
 	
 	;-------
 	; Bereken de next direction via Lambertian reflectance
-	; pseudo code: Next ray.dir = normal + vec3_in_unit_sphere
+	; pseudo code: Next ray.dir = normal + vec3_in_unit_hemisphere
+	;   OPM het is vec3_in_unit_hemisphere niet vec3_in_unit_sphere
+	;      vec3_in_unit_sphere werd veel foutief gebruikt.
 	;-------
 	lea ebx, [@@vec3_tmp]
-	call vec3_in_unit_sphere, ebx
+	add eax, SPHERE_DIFFUSE_OFFSET
+	mov esi, [dword eax]
+	call vec3_in_unit_hemisphere, edx, esi, ebx
 	mov esi, ecx
 	add esi, RAY_DIR_OFFSET
 	call vec3_add_res, ebx, edx, esi
@@ -428,7 +427,7 @@ rep stosb
 	;----
 	; bereken de kleur: gebruikt eax
 	;----
-	mov eax, [dword @@sphere_ptr];      eax: sphere
+	sub eax, SPHERE_DIFFUSE_OFFSET;      eax: sphere
 	mov esi, [dword @@ray_ptr];         esi: oude ray
 	;                             ecx: nieuwe ray	
 	fld  [dword eax + sphere_obj.color_r]
@@ -1007,9 +1006,9 @@ DATASEG
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.0, 0.0, 1>,\
-	                        <0.2,  0.0, 0.7, 0.1, 0.0, 0.5, 0.0, 1>,\
-	                        <0.0,  0.0, 2.0, 1.0, 0.5, 0.5, 0.5, 1>
+	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.0, 0.0, 1.0, 1>,\
+	                        <0.2,  0.0, 0.7, 0.1, 0.0, 0.5, 0.0, 1.0, 1>,\
+	                        <0.0,  0.0, 2.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1>
 
 	;num_spheres  dd 1
 	;sphere_datas sphere_obj <0.0,  0.0, 3.0, 1.0, 1.0, 1.0, 1.0, 1>

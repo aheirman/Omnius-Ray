@@ -183,6 +183,30 @@ PROC vec3_dot
 	ret
 ENDP vec3_dot
 
+PROC vec3_neg
+	ARG @@VEC3_PTR1:dword
+	USES eax, ebx
+	
+	mov eax, [@@VEC3_PTR1]
+	
+	fldz
+	fld  [dword eax + vec3.x]
+	fsubp
+	fstp [dword eax + vec3.x]
+
+	fldz
+	fld  [dword eax + vec3.y]
+	fsubp
+	fstp [dword eax + vec3.y]
+	
+	fldz
+	fld  [dword eax + vec3.z]
+	fsubp
+	fstp [dword eax + vec3.z]
+	
+	ret
+ENDP vec3_neg
+
 PROC print_vec3
 	ARG @@vec_ptr:dword
 	uses eax, ecx
@@ -314,9 +338,9 @@ ENDP average_4_color_res
 PROC vec3_in_unit_sphere
 	;Uses: Rejection sampling
 	;      https://en.wikipedia.org/wiki/Rejection_sampling#Examples
-	ARG @@VEC3_PTR:dword
+	ARG @@VEC3_DEST_PTR:dword
 	USES eax, ebx, ecx, edx, esi
-	mov esi, [@@VEC3_PTR]
+	mov esi, [@@VEC3_DEST_PTR]
 
 	sub esp, 4
 	mov ebx, esp
@@ -342,7 +366,6 @@ PROC vec3_in_unit_sphere
 	fld [dword ebx]
 	fld1
 	fcompp ST(1)
-	                    ;compare the value of ST(0) to +0.0
 	fstsw ax            ;copy the Status Word containing the result to AX
 	fwait               ;insure the previous instruction is completed
 	sahf                ;transfer the condition codes to the CPU's flag register
@@ -377,6 +400,52 @@ PROC vec3_in_unit_sphere
 	add esp, 4
 	ret
 ENDP vec3_in_unit_sphere
+
+PROC vec3_in_unit_hemisphere
+	ARG @@NORMAL:dword, @@MULTIPLIER:dword, @@DEST:dword
+	LOCAL @@DOT_PROD:dword
+	USES eax, ebx, ecx
+	
+	mov ecx, [@@DEST]
+	call vec3_in_unit_sphere, ecx
+
+	mov eax, [@@MULTIPLIER]
+	call vec3_mul_float_res, ecx, eax, ecx
+	
+	lea ebx, [@@DOT_PROD]
+	mov eax, [@@NORMAL]
+	call vec3_dot, ecx, eax, ebx
+	
+	fld [dword ebx]
+	ftst                ;equivalent met fldz fcomp ST(1)
+	                    ;compare the value of ST(0) to +0.0
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe @@error_handler ;the comparison was indeterminate
+					    ;this condition should be verified first
+					    ;then only two of the next three conditional jumps
+					    ;should become necessary, in whatever order is preferred,
+					    ;the third jump being replaced by code to handle that case
+	;ja   st0_positive   ;when all flags are 0
+	;jb   st0_negative   ;only the C0 bit (CF flag) would be set if no error
+	;jz   st0_zero       ;only the C3 bit (ZF flag) would be set if no error
+	ja @@end; no invert needed
+
+	call vec3_neg, ecx
+	
+	jmp @@end
+@@error_handler:
+	mov ah, 09h
+	mov edx, offset msg_comparison_was_indeterminate
+	int 21h
+
+	mov	ah,00h
+	int	16h
+	call terminate_process
+@@end:
+	ret
+ENDP vec3_in_unit_hemisphere
 
 PROC vec3_mul_vec3_res
 	ARG @@VEC3_PTR_1:dword, @@VEC3_PTR_2:dword, @@res_ptr:dword

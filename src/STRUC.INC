@@ -36,18 +36,20 @@ STRUC ray_obj
 	count             db 0
 ENDS ray_obj
 
-;Size: 7*4ytes + 2 bytes = 30 bytes
-SPHERE_SIZE EQU 30
+;Size: 8*4ytes + 2 bytes = 34 bytes
+SPHERE_SIZE EQU 34
 SPHERE_COLOR_OFFSET EQU 16
+SPHERE_DIFFUSE_OFFSET EQU 28
 STRUC sphere_obj
 	origin_x    dd 0.0
 	origin_y    dd 0.0
 	origin_z    dd 0.0
 	radius      dd 0.0
-	color_r     dd 0.0   ; in byte procent: 255: 100%, 0: 0% indien het reflectief is,
-	color_g     dd 0.0   ; anders is het 100 lux
+	color_r     dd 0.0; in byte procent: 255: 100%, 0: 0% indien het reflectief is,
+	color_g     dd 0.0; anders is het 100 lux
 	color_b     dd 0.0
-	control     db 0; bit 0: LOW: reflectief, HIGH: lichtbron
+	diffuseness dd 0.0;  0.0: spiegel; 1.0: niet-spiegel
+	control     db 0;    bit 0: LOW: reflectief, HIGH: lichtbron
 	padding     db 0
 ENDS sphere_obj
 

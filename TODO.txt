@@ -1,0 +1,8 @@
+https://raytracing.github.io/books/RayTracingInOneWeekend.html#addingasphere/creatingourfirstraytracedimage
+
+Gamma correction
+	https://learnopengl.com/Advanced-Lighting/Gamma-Correction
+	https://stackoverflow.com/questions/61138110/what-is-the-correct-gamma-correction-function
+	https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_framebuffer_sRGB.txt
+	
+	
