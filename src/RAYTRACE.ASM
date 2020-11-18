@@ -101,10 +101,23 @@ PROC print_sphere
 	ret
 ENDP
 
-
-
-
-
+; Pops st0
+MACRO load_load_col_col_mul loc1:=<text_string>, loc2:=<text_string>, loc3:=<text_string>
+	fld  [&loc1&_r]
+	fld  [&loc2&_r]
+	fmulp
+	fstp [&loc3&_r]
+	
+	fld  [&loc1&_g]
+	fld  [&loc2&_g]
+	fmulp
+	fstp [&loc3&_g]
+	
+	fld  [&loc1&_b]
+	fld  [&loc2&_b]
+	fmulp
+	fstp [&loc3&_b]
+ENDM load_load_col_col_st0_mul
 ; _       _                          _                 _                   
 ;(_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ _ __ | |__   ___ _ __ ___ 
 ;| | '_ \| __/ _ \ '__/ __|/ _ \/ __| __|   / __| '_ \| '_ \ / _ \ '__/ _ \
@@ -426,24 +439,12 @@ rep stosb
 
 	;----
 	; bereken de kleur: gebruikt eax
+	; NOTE: WE DON'T NEED TO CORRECT FOR THE SQUARE CUBE LAW
 	;----
 	sub eax, SPHERE_DIFFUSE_OFFSET;      eax: sphere
 	mov esi, [dword @@ray_ptr];         esi: oude ray
 	;                             ecx: nieuwe ray	
-	fld  [dword eax + sphere_obj.color_r]
-	fld  [dword esi + ray_obj.color_r]
-	fmulp
-	fstp [dword ecx + ray_obj.color_r]
-	
-	fld  [dword eax + sphere_obj.color_g]
-	fld  [dword esi + ray_obj.color_g]
-	fmulp
-	fstp [dword ecx + ray_obj.color_g]
-	
-	fld  [dword eax + sphere_obj.color_b]
-	fld  [dword esi + ray_obj.color_b]
-	fmulp
-	fstp [dword ecx + ray_obj.color_b]
+	load_load_col_col_mul <dword eax + sphere_obj.color>, <dword esi + ray_obj.color>, <dword ecx + ray_obj.color>
 	
 	;DEBUG
 	;call print_ray, esi
@@ -636,7 +637,123 @@ PROC intersect_objects
 	ret
 ENDP intersect_objects
 
+; uses eax
+MACRO FLOAT_TEST label_error, label_pos, label_neg, label_zero
+	ftst                ;equivalent met fldz fcomp ST(1)
+	                    ;compare the value of ST(0) to +0.0
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe label_error ;the comparison was indeterminate
+					    ;this condition should be verified first
+					    ;then only two of the next three conditional jumps
+					    ;should become necessary, in whatever order is preferred,
+					    ;the third jump being replaced by code to handle that case
+	ja   label_pos   ;when all flags are 0
+	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
+	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
+ENDM FLOAT_TEST
 
+MACRO FLOAT_TEST_stx st_num, label_error, label_pos, label_neg, label_zero
+	fcomp st( st_num )
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe label_error ;the comparison was indeterminate
+					    ;this condition should be verified first
+					    ;then only two of the next three conditional jumps
+					    ;should become necessary, in whatever order is preferred,
+					    ;the third jump being replaced by code to handle that case
+	ja   label_pos   ;when all flags are 0
+	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
+	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
+ENDM FLOAT_TEST
+
+;st0 = st(0)^st(1)
+MACRO POW
+;;SOURCE https://www.madwizard.org/programming/snippets?id=36
+    fyl2x; y*log_2 (x); 1 erop
+    fld1
+    fld st(1); 3 er op
+    fprem; Remainder = ST(0) - (Q * ST(1)) , Q = truncating the quotient of ST(0)÷ST(1)
+    f2xm1; 2^x -1; 3 er op
+    fadd
+    fscale; 3 er op
+    fxch st(1)
+    fstp st
+ENDM POW
+
+MACRO FLOAT_TEST_stx_enable st_num, enable_err, enable_pos, enable_neg, enable_zero, label_error, label_pos, label_neg, label_zero
+	fcomp st( st_num )
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+IF enable_err
+	jpe label_error ;the comparison was indeterminate
+					    ;this condition should be verified first
+					    ;then only two of the next three conditional jumps
+					    ;should become necessary, in whatever order is preferred,
+					    ;the third jump being replaced by code to handle that case
+ENDIF
+IF enable_pos
+	ja   label_pos   ;when all flags are 0
+ENDIF
+IF enable_neg
+	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
+ENDIF
+IF enable_zero
+	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
+ENDIF
+ENDM FLOAT_TEST
+
+; Converts float to byte
+; stores the color in the line buffer
+; stores trunkated in b-the byte that will be used for 13h screen buffer
+; It also does color space correction:
+;	https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_framebuffer_sRGB.txt
+; WARNING USES: EAX
+MACRO color_to_color loc_in_float_stack, bmp_offset, shr_number
+	LOCAL @@collor_correction_finished, @@exponential, @@not_cliping
+	;; Color space correction
+	;;if (cl < 0.0031308) {
+    ;;    cs = 12.92 * cl;
+    ;;} else {
+    ;;    cs = 1.055 * pow(cl, 0.41666) - 0.055;
+    ;;}
+	fld [dword offset nr_srgb_1]
+	FLOAT_TEST_stx_enable 1, 1,0,1,0, @@error_handler, , @@exponential
+	fld [dword offset nr_srgb_2]
+	fmulp
+	jmp @@collor_correction_finished
+@@exponential:
+	fld [dword offset nr_srgb_4]
+	fxch st(1)
+	POW
+	fld [dword offset nr_srgb_3]
+	fmulp
+	fld [dword offset nr_srgb_6]
+	fsubp
+@@collor_correction_finished:
+
+
+	;;All the rest
+	;; loc_in_float_stackis the location of 255.0 in the float stack
+	fmul st, st( loc_in_float_stack )
+	fistp [dword esp]
+	mov edx, [dword esp]
+	;;call print_int, edx
+	cmp edx, 255
+	jl @@not_cliping
+	;;call print_endl
+	mov edx, 255
+@@not_cliping:
+	mov [byte ecx + bmp_offset], dl
+	;; Anden met 3e bovenste bits
+	and edx, 224
+	;call print_int, edx
+	shr edx, shr_number
+	add edi, edx
+ENDM  color_to_color
 
 ;     _ __ __ _ _   _   | |_ _ __ __ _  ___ ___ 
 ;    | '__/ _` | | | |  | __| '__/ _` |/ __/ _ \
@@ -839,67 +956,21 @@ rep stosb
 	;---
 	;Bit    7  6  5  4  3  2  1  0
 	;Data   R  R  R  G  G  G  B  B
-	xor eax, eax; Will be used as the packed color
 	mov edi, offset pixel_samples
 	fld [dword offset nr_max_byte_float]
 	fld [dword edi + vec3.z]
 	fld [dword edi + vec3.y]
 	fld [dword edi + vec3.x]
 	
-	;---
-	;red
-	;---
-	fmul st, st(3)
-	fistp [dword esp]
-	mov edx, [dword esp]
-	;call print_int, edx
-	cmp edx, 255
-	jl @@not_cliping_r
-	;call print_endl
-	mov edx, 255
-@@not_cliping_r:
-	mov [byte ecx + byte_vec3.z], dl
-	and edx, 224; 3 bovenste bits
-	;call print_int, edx
-	add eax, edx
-	;---
-	;green
-	;---
-	fmul st, st(2)
-	fistp [dword esp]
-	mov edx, [dword esp]
-	;call print_int, edx
-	cmp edx, 255
-	jl @@not_cliping_g
-	;call print_endl
-	mov edx, 255
-@@not_cliping_g:
-	mov [byte ecx + byte_vec3.y], dl
-	and edx, 224
-	;call print_int, edx
-	shr edx, 3
-	add eax, edx
-	;---
-	; blue
-	;---
-	fmul st, st(1)
-	fistp [dword esp]
-	mov edx, [dword esp]
-	;call print_int, edx
-	cmp edx, 255
-	jl @@not_cliping_b
-	mov edx, 255
-	;call print_endl
-@@not_cliping_b:
-	mov [byte ecx + byte_vec3.x], dl
-	and edx, 224
-	;call print_int, edx
-	shr edx, 6
-	add eax, edx
+	xor edi, edi; Will be used as the packed color
+	color_to_color 3, byte_vec3.z, 0;  r
+	color_to_color 2, byte_vec3.y, 3;  g
+	color_to_color 1, byte_vec3.x, 6;  b
+
 	;--------------------
 	; End of color
 	;--------------------	
-	mov [dword esi], eax
+	mov [dword esi], edi
 	
 
 
@@ -921,6 +992,12 @@ rep stosb
 	
 	add esp, @@LOCAL_STACK_SIZE
 	ret
+	
+	@@error_handler:
+	mov ah, 09h
+	mov edx, offset msg_comparison_was_indeterminate
+	int 21h
+
 ENDP ray_trace
 
 
@@ -994,6 +1071,16 @@ DATASEG
 	nr_half           dd 0.5
 	nr_background     dd 0.5
 	nr_zero           dd 0.0
+	
+	;---
+	; SRGB COLOR SPACE VALUES
+	;---
+	nr_srgb_1         dd 0.0031308
+	nr_srgb_2         dd 12.92
+	nr_srgb_3         dd 1.055
+	nr_srgb_4         dd 0.41666
+	nr_srgb_6         dd 0.055
+	
 	msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$'; 13, 10 == carrige return & \n
 	msg_pos_discreminant             db "positieve (or zero) discreminant", 13, 10, '$'; 
 	msg_neg_discreminant             db "negatieve discreminant", 13, 10, '$'; 
@@ -1006,8 +1093,8 @@ DATASEG
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.0, 0.0, 1.0, 1>,\
-	                        <0.2,  0.0, 0.7, 0.1, 0.0, 0.5, 0.0, 1.0, 1>,\
+	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.2, 0.2, 0.0, 1>,\
+	                        <0.2,  0.0, 0.7, 0.1, 0.2, 0.5, 0.2, 0.0, 1>,\
 	                        <0.0,  0.0, 2.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1>
 
 	;num_spheres  dd 1
