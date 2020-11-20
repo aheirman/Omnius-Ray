@@ -63,6 +63,14 @@ STRUC sphere_obj
 	diffuseness     dd 0.0;  0.0: spiegel;         1.0: niet-spiegel
 	control         db 0;    bit 0: LOW: reflectief, HIGH: lichtbron
 	padding         db 0
-ENDS sphere_obj
+ENDS  sphere_obj
 
-
+PLANE_SIZE EQU 12
+PLANE_REFLECTIVITY_OFFSET   EQU 0
+PLANE_LAMBERTIAN_MUL_OFFSET EQU 4
+PLANE_DIFFUSE_OFFSET        EQU 8
+STRUC plane_obj
+	reflectivity    dd 0.0
+	lambertian_mul  dd 0.0;  0.0: perfect normaal; 1.0: perfect lambertian
+	diffuseness     dd 0.0;  0.0: spiegel;         1.0: niet-spiegel
+ENDS  plane_obj

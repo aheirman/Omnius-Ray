@@ -122,9 +122,48 @@ MACRO is_positive
 	jz @@finish
 ENDM is_positive
 
-MACRO REFLECT
-
-ENDM  REFLECT
+; ebx: ray ptr
+; ecx: next_ray ptr
+; edx: normal
+; edi: temporary
+MACRO NEXT_RAY_DIR lambertian_mul_loc:=<text_string>, diffuse_mul_offset:=<text_string>
+	;;-------
+	;; Bereken de next direction via Lambertian reflectance
+	;; pseudo code: Next ray.dir = normal + vec3_in_unit_hemisphere
+	;;   OPM het is vec3_in_unit_hemisphere niet vec3_in_unit_sphere
+	;;      vec3_in_unit_sphere werd veel foutief gebruikt.
+	;;-------
+	mov esi, [&lambertian_mul_loc&]
+	call vec3_in_unit_hemisphere, edx, esi, edi
+	VEC3_LOAD   <edx + vec3.>; normaal
+	VEC3_LOAD   <edi + vec3.>
+	VEC3_VEC3_ADD; lambertian = normal + hemisphere
+	;;VEC3D_NORMALIZE
+	VEC3_STOREP <edi + vec3.>
+	
+	;;-------
+	;; Bereken de next direction via Reflection
+	;; pseudo code: Next ray.dir = ray.dir - 2*dot(ray.dir,normal)*normal;
+	;;-------
+	;; Note: normaal zit bovenaan
+	VEC3_LOAD <ebx + ray_obj.direction_>; laod direction of old ray
+	VEC3_VEC3_DOT_ST0
+	fld [dword offset nr_n2]
+	fmulp st(1),st(0)
+	fstp st(7)
+	VEC3S_ST_MUL <6>
+	VEC3_VEC3_ADD
+	;;VEC3D_NORMALIZE
+	
+	;;---
+	;; Neem een gewogen gemiddelde
+	;;---
+	VEC3_LOAD   <edi + vec3.>; lambertian
+	fld [&diffuse_mul_offset&]
+	fstp st(7); steekt het in 6
+	VEC3_VEC3_ST6_WEIGHTED_AVG
+	VEC3_STOREP <ecx + ray_obj.direction_>
+ENDM  NEXT_RAY_DIR
 
 ; _       _                          _                 _                   
 ;(_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ _ __ | |__   ___ _ __ ___ 
@@ -397,49 +436,10 @@ rep stosb
 	lea edx, [@@vec3_normal]
 	call vec3_normalize_dest, edi, edx
 	
-	;-------
-	; Bereken de next direction via Lambertian reflectance
-	; pseudo code: Next ray.dir = normal + vec3_in_unit_hemisphere
-	;   OPM het is vec3_in_unit_hemisphere niet vec3_in_unit_sphere
-	;      vec3_in_unit_sphere werd veel foutief gebruikt.
-	;-------
-
-	mov esi, [dword eax + SPHERE_LAMBERTIAN_MUL_OFFSET]
-	
-	call vec3_in_unit_hemisphere, edx, esi, edi
-
-	VEC3_LOAD   <edx + vec3.>; normaal
-	VEC3_LOAD   <edi + vec3.>
-	VEC3_VEC3_ADD; lambertian = normal + hemisphere
-	;VEC3D_NORMALIZE
-	VEC3_STOREP <edi + vec3.>
-	
-	;-------
-	; Bereken de next direction via Reflection
-	; pseudo code: Next ray.dir = ray.dir - 2*dot(ray.dir,normal)*normal;
-	;-------
-	; Note: normaal zit bovenaan
-	VEC3_LOAD <edx + vec3.>
-	VEC3_LOAD <ebx + ray_obj.direction_>; laod direction of old ray
-	VEC3_VEC3_DOT_ST0
-	fld [dword offset nr_n2]
-	fmulp st(1),st(0)
-	fstp st(7)
-	VEC3S_ST_MUL <6>
-	VEC3_VEC3_ADD
-	;VEC3D_NORMALIZE
-	
-	;---
-	; Neem een gewogen gemiddelde
-	;---
-	VEC3_LOAD   <edi + vec3.>; lambertian
-	fld [dword eax + SPHERE_DIFFUSE_OFFSET]
-	fstp st(7); steekt het in 6
-	VEC3_VEC3_ST6_WEIGHTED_AVG
-	VEC3_STOREP <ecx + ray_obj.direction_>
+	NEXT_RAY_DIR <dword eax + SPHERE_LAMBERTIAN_MUL_OFFSET>, <dword eax + SPHERE_DIFFUSE_OFFSET>
 
 	;call print_ray, ecx
-
+	
 	;----
 	; DEBUG: kleur op basis van normaal
 	; pseudo code: 0.5*vec3(N.x()+1, N.y()+1, N.z()+1);
@@ -498,7 +498,7 @@ ENDP intersect_sphere
 
 PROC intersect_ground
 	ARG @@ray_ptr:dword, @@next_ray_ptr:dword
-	;LOCAL @@color_ground:color
+	LOCAL @@NORMAL:vec3, @@VEC_TMP1:vec3
 	uses eax, ebx, ecx, edx, edi, esi
 	
 	
@@ -525,13 +525,15 @@ PROC intersect_ground
 	fst [dword ebx + ray_obj.depth]; Update the ray-depth
 	; depth is now guaranteed smaller
 	
-	;TODO: fix normal
+	lea edx, [@@NORMAL]
 	fldz
-	fst  [dword ecx + ray_obj.direction_x]
-	fstp [dword ecx + ray_obj.direction_z]
+	fst  [dword edx + vec3.x]
+	fstp [dword edx + vec3.z]
 	fld1
-	fstp [dword ecx + ray_obj.direction_y]
+	fstp [dword edx + vec3.y]
+	lea edi, [@@VEC_TMP1]
 	
+	NEXT_RAY_DIR <dword offset plane + PLANE_LAMBERTIAN_MUL_OFFSET>, <dword offset plane + PLANE_DIFFUSE_OFFSET>
 
 	
 	; st = ray_obj.depth
@@ -543,7 +545,7 @@ PROC intersect_ground
 	
 	
 	
-	fld [dword offset nr_ground_reflectivity]
+	fld [dword offset plane + PLANE_REFLECTIVITY_OFFSET]
 	COL_LOAD  <dword ebx + ray_obj.color_>
 	;VEC3_LOADZ
 	;VEC3_LOAD1
@@ -1125,7 +1127,6 @@ DATASEG
 	nr_background     dd 0.5
 	nr_zero           dd 0.0
 	nr_tiny           dd 0.0001
-	nr_ground_reflectivity dd 0.7
 	nr_n2             dd -2.0
 	;---
 	; SRGB COLOR SPACE VALUES
@@ -1148,12 +1149,11 @@ DATASEG
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.2, 0.2, 1.0, 0.1, 1>,\
-	                        <0.2,  0.0, 0.7, 0.1, 0.2, 0.5, 0.2, 1.0, 0.1, 1>,\
+	sphere_datas sphere_obj <-0.2, 0.36, 0.7, 0.1, 0.5, 0.2, 0.2, 1.0, 0.1, 1>,\
+	                        <0.2,  0.36, 0.7, 0.1, 0.2, 0.5, 0.2, 1.0, 0.1, 1>,\
 	                        <0.0,  1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1>
 
-	;num_spheres  dd 1
-	;sphere_datas sphere_obj <0.0,  0.0, 3.0, 1.0, 1.0, 1.0, 1.0, 1>
+	plane plane_obj <0.7, 1.0, 0.1>
 	
 	pixel_samples vec3 4 DUP(?)
 	
@@ -1162,7 +1162,7 @@ DATASEG
 	;background_colors vec3 <1.0, 1.0, 1.0>, <1.0, 1.0, 1.0>
 	;background_colors vec3 <0.0, 0.0, 0.0>, <1.0, 1.0, 1.0>
 	
-	camera_start_origin vec3 <0.0, 0.3, 0.0>;<0.3, 0.1, -0.3>
+	camera_start_origin vec3 <0.0, 0.5, 0.0>;<0.3, 0.1, -0.3>
 UDATASEG
 	pixel_row db NUM_PIXEL_ROW_BYTES dup (?)
 END
