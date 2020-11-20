@@ -21,6 +21,7 @@ INCLUDE "VEC.INC"
 INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
 INCLUDE "FILE.INC"
+INCLUDE "MACRO.INC"
 
 ; compile-time constants (with macros)
 VMEMADR   EQU 0A0000h	; video memory address
@@ -29,7 +30,7 @@ SCRHEIGHT EQU 200	; screen height
 
 NUM_SUB_PIXELS          EQU 4
 NUM_SUB_PIXELS_PER_AXIS EQU 2
-MAX_BOUNCES             EQU 10
+MAX_BOUNCES             EQU 30
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -101,23 +102,30 @@ PROC print_sphere
 	ret
 ENDP
 
-; Pops st0
-MACRO load_load_col_col_mul loc1:=<text_string>, loc2:=<text_string>, loc3:=<text_string>
-	fld  [&loc1&_r]
-	fld  [&loc2&_r]
-	fmulp
-	fstp [&loc3&_r]
-	
-	fld  [&loc1&_g]
-	fld  [&loc2&_g]
-	fmulp
-	fstp [&loc3&_g]
-	
-	fld  [&loc1&_b]
-	fld  [&loc2&_b]
-	fmulp
-	fstp [&loc3&_b]
-ENDM load_load_col_col_st0_mul
+MACRO is_depth_smaller
+	fld [ebx + ray_obj.depth]
+	fcomp
+	fstsw ax            ;copy the Status Word containing the result to AX
+	fwait               ;insure the previous instruction is completed
+	sahf                ;transfer the condition codes to the CPU's flag register
+	jpe @@error_handler
+	jb @@finish
+ENDM is_depth_smaller
+
+MACRO is_positive
+	ftst
+	fstsw ax
+	fwait
+	sahf
+	jpe @@error_handler
+	jb @@finish
+	jz @@finish
+ENDM is_positive
+
+MACRO REFLECT
+
+ENDM  REFLECT
+
 ; _       _                          _                 _                   
 ;(_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ _ __ | |__   ___ _ __ ___ 
 ;| | '_ \| __/ _ \ '__/ __|/ _ \/ __| __|   / __| '_ \| '_ \ / _ \ '__/ _ \
@@ -345,17 +353,8 @@ rep stosb
 	;-------
 	; Is de nieuwe afstand de kleinste afstand die tot nu toe is gevonden?
 	;------
-	fld [ebx + ray_obj.depth]
-	fcomp
-	fstsw ax            ;copy the Status Word containing the result to AX
-	fwait               ;insure the previous instruction is completed
-	sahf                ;transfer the condition codes to the CPU's flag register
-	jpe @@error_handler
-	jb @@finish
-	
+	is_depth_smaller
 	fstp [ebx + ray_obj.depth]; Update the ray-depth
-	
-	
 	;-------------
 	;--------------
 	; UPDATING RAY
@@ -372,32 +371,31 @@ rep stosb
 	; Zet de nieuwe origin
 	; pseudo code: nieuwe_origin = oude_origin + oude_direction * t;
 	;---
-	; ebx: ptr naar ray
+	; ebx: ptr naar oude ray
 	mov ebp, [esp + @@LOCAL_STACK_SIZE]; Zet ebp terug goed
 	mov ecx, [@@next_ray_ptr]
-	
 	mov esi, [ebx + ray_obj.depth]; lengte
+	
 	add ebx, RAY_DIR_OFFSET
 	call vec3_mul_float_res, ebx, esi, ecx; sla direction*depth tijdelijk op in new origin
-	
 	sub ebx, RAY_DIR_OFFSET
+	
 	; esi: tijdelijke vec, ebx origin ptr oud --> ecx: origin nieuw
 	call vec3_add_res, ebx, ecx, ecx
-	
 
 	
 	;-------
 	; Bereken de normaal
 	; pseudo code: normalize(nieuwe_origin-sphere_center)
 	;-------
-	lea ebx, [@@vec3_tmp];  Dit zal de ongenormaliseerde normaal zijn.
+	lea edi, [@@vec3_tmp];  Dit zal de ongenormaliseerde normaal zijn.
 	mov eax, [@@sphere_ptr];          ptr naar sphere, het eerste is de origin
-	call vec3_sub_res, ecx, eax, ebx; links, rechts, ptr
+	call vec3_sub_res, ecx, eax, edi; links, rechts, ptr
 	;call print_vec3, ecx
 	;call print_vec3, eax
-	;call print_vec3, ebx
+	;call print_vec3, edi
 	lea edx, [@@vec3_normal]
-	call vec3_normalize_dest, ebx, edx
+	call vec3_normalize_dest, edi, edx
 	
 	;-------
 	; Bereken de next direction via Lambertian reflectance
@@ -405,13 +403,40 @@ rep stosb
 	;   OPM het is vec3_in_unit_hemisphere niet vec3_in_unit_sphere
 	;      vec3_in_unit_sphere werd veel foutief gebruikt.
 	;-------
-	lea ebx, [@@vec3_tmp]
-	add eax, SPHERE_DIFFUSE_OFFSET
-	mov esi, [dword eax]
-	call vec3_in_unit_hemisphere, edx, esi, ebx
-	mov esi, ecx
-	add esi, RAY_DIR_OFFSET
-	call vec3_add_res, ebx, edx, esi
+
+	mov esi, [dword eax + SPHERE_LAMBERTIAN_MUL_OFFSET]
+	
+	call vec3_in_unit_hemisphere, edx, esi, edi
+
+	VEC3_LOAD   <edx + vec3.>; normaal
+	VEC3_LOAD   <edi + vec3.>
+	VEC3_VEC3_ADD; lambertian = normal + hemisphere
+	;VEC3D_NORMALIZE
+	VEC3_STOREP <edi + vec3.>
+	
+	;-------
+	; Bereken de next direction via Reflection
+	; pseudo code: Next ray.dir = ray.dir - 2*dot(ray.dir,normal)*normal;
+	;-------
+	; Note: normaal zit bovenaan
+	VEC3_LOAD <edx + vec3.>
+	VEC3_LOAD <ebx + ray_obj.direction_>; laod direction of old ray
+	VEC3_VEC3_DOT_ST0
+	fld [dword offset nr_n2]
+	fmulp st(1),st(0)
+	fstp st(7)
+	VEC3S_ST_MUL <6>
+	VEC3_VEC3_ADD
+	;VEC3D_NORMALIZE
+	
+	;---
+	; Neem een gewogen gemiddelde
+	;---
+	VEC3_LOAD   <edi + vec3.>; lambertian
+	fld [dword eax + SPHERE_DIFFUSE_OFFSET]
+	fstp st(7); steekt het in 6
+	VEC3_VEC3_ST6_WEIGHTED_AVG
+	VEC3_STOREP <ecx + ray_obj.direction_>
 
 	;call print_ray, ecx
 
@@ -441,15 +466,10 @@ rep stosb
 	; bereken de kleur: gebruikt eax
 	; NOTE: WE DON'T NEED TO CORRECT FOR THE SQUARE CUBE LAW
 	;----
-	sub eax, SPHERE_DIFFUSE_OFFSET;      eax: sphere
+	;      eax: sphere
 	mov esi, [dword @@ray_ptr];         esi: oude ray
 	;                             ecx: nieuwe ray	
-	load_load_col_col_mul <dword eax + sphere_obj.color>, <dword esi + ray_obj.color>, <dword ecx + ray_obj.color>
-	
-	;DEBUG
-	;call print_ray, esi
-	;mov ebx, [@@next_ray_ptr]
-	;call print_ray, ebx
+	load_load_col_col_mul <dword eax + sphere_obj.color_>, <dword esi + ray_obj.color_>, <dword ecx + ray_obj.color_>
 	
 
 	jmp @@finish
@@ -476,8 +496,84 @@ rep stosb
 	ret
 ENDP intersect_sphere
 
+PROC intersect_ground
+	ARG @@ray_ptr:dword, @@next_ray_ptr:dword
+	;LOCAL @@color_ground:color
+	uses eax, ebx, ecx, edx, edi, esi
+	
+	
+	mov ebx, [@@ray_ptr]
+	mov ecx, [@@next_ray_ptr]
+	
+	
+	;Check if the direction is zero, if so, not intersecting
 
+	fld [ebx + ray_obj.direction_y]
+	FLOAT_SKIP_IF_TINY
+	; direction is no longer tiny
+	; calculate distance
+	fld [ebx + ray_obj.origin_y]
+	
+	fdivrp st(1), st; t = origin_y/direction_y
+	fchs
+	is_positive
+	FLOAT_SKIP_IF_TINY
+	is_depth_smaller
+	; We've hit it & It's the best one we've found
+	mov [byte ebx + ray_obj.hit], 1
+	
+	fst [dword ebx + ray_obj.depth]; Update the ray-depth
+	; depth is now guaranteed smaller
+	
+	;TODO: fix normal
+	fldz
+	fst  [dword ecx + ray_obj.direction_x]
+	fstp [dword ecx + ray_obj.direction_z]
+	fld1
+	fstp [dword ecx + ray_obj.direction_y]
+	
 
+	
+	; st = ray_obj.depth
+	; nieuwe_origin = oude_origin + oude_direction * t;
+	VEC3_LOAD  <dword ebx + ray_obj.origin_>
+	VEC3_LOAD  <dword ebx + ray_obj.direction_>
+	VEC3D_ST6_MUL_VEC3_ADD
+	VEC3_STOREP <dword ecx + ray_obj.origin_>
+	
+	
+	
+	fld [dword offset nr_ground_reflectivity]
+	COL_LOAD  <dword ebx + ray_obj.color_>
+	;VEC3_LOADZ
+	;VEC3_LOAD1
+	;VEC3_VEC3_MU
+	VEC3D_ST_MUL <3>
+	COL_STORE <dword ecx + ray_obj.color_>
+	
+	
+	;call print_ray, ebx
+	;call print_ray, ecx
+	;call print_int, ebx
+	;call print_int, ecx
+	
+@@finish:
+	ret
+
+@@error_handler:
+	mov ah, 09h
+	mov edx, offset msg_comparison_was_indeterminate
+	int 21h
+	
+	call print_rounded_floatx1000, [ebx + ray_obj.origin_y]
+	call print_rounded_floatx1000, [ebx + ray_obj.direction_y]
+	
+	mov	ah,00h
+	int	16h
+	call terminate_process
+ENDP intersect_ground
+	
+	
 ;    _       _                          _            _     _           _       
 ;   (_)_ __ | |_ ___ _ __ ___  ___  ___| |_     ___ | |__ (_) ___  ___| |_ ___ 
 ;   | | '_ \| __/ _ \ '__/ __|/ _ \/ __| __|   / _ \| '_ \| |/ _ \/ __| __/ __|
@@ -499,10 +595,12 @@ PROC intersect_objects
 	; Zorg ervoor dat de kleur altijd klaar is voor de volgende 
 	;----
 	fld1
+	fst  [dword ebx + ray_obj.color_r]
+	fst  [dword ebx + ray_obj.color_g]
+	fst  [dword ebx + ray_obj.color_b]
 	fst  [dword edx + ray_obj.color_r]
 	fst  [dword edx + ray_obj.color_g]
-	fstp [dword edx + ray_obj.color_b]
-	
+	fstp [dword edx + ray_obj.color_b]	
 	
 	mov ecx, MAX_BOUNCES
 @@ray_loop_begin:
@@ -520,11 +618,10 @@ PROC intersect_objects
 	fdivp
 	fstp [dword ebx + ray_obj.depth]
 	mov  [byte ebx + ray_obj.hit], 0
-	mov  [byte edx + ray_obj.hit], 0
 	
-@@object_loop_begin:
+@@sphere_loop_begin:
 	cmp ecx, 0
-	je @@object_loop_end
+	je @@sphere_loop_end
 	
 	;call print_sphere, eax
 	;call print_ray, ebx
@@ -538,8 +635,17 @@ PROC intersect_objects
 	
 	dec ecx
 	add eax, SPHERE_SIZE
-	jmp @@object_loop_begin
-@@object_loop_end:
+	jmp @@sphere_loop_begin
+@@sphere_loop_end:
+
+	call intersect_ground, ebx, edx
+	;call print_ray, ebx
+	;call print_ray, edx
+	;call print_int, ebx
+	;call print_int, edx
+    ;                                     ebx: ray
+	;                                     edx: next ray
+
 	;call print_int, 6
 	;call print_endl
 	;call print_ray, ebx
@@ -574,6 +680,8 @@ PROC intersect_objects
 	loop @@ray_loop_begin
 	jmp @@expended_ray_intersect_budget
 
+
+	;jmp @@end
 	;---
 	;We zijn in de buitenlucht
 	;---
@@ -606,9 +714,6 @@ PROC intersect_objects
 	call vec3_mul_float_res, offset background_colors + VEC3_SIZE, [dword @@TMP_VAR_2], ecx
 	
 	call vec3_add_res, eax, ecx, eax
-	;mov [esi + vec3.x],  0
-	;mov [esi + vec3.y],  0
-	;mov [esi + vec3.z],  0
 	
 	;---
 	; Vermenigvuldig background color
@@ -616,6 +721,12 @@ PROC intersect_objects
 	mov ecx, ebx
 	add ecx, RAY_COL_OFFSET
 	call vec3_mul_vec3_res, eax, ecx, esi
+	
+	;mov eax, [dword offset nr_1]
+	;mov [esi + vec3.x],  eax
+	;mov [esi + vec3.y],  eax
+	;mov [esi + vec3.z],  eax
+	
 	jmp @@end
 	
 	
@@ -637,74 +748,6 @@ PROC intersect_objects
 	ret
 ENDP intersect_objects
 
-; uses eax
-MACRO FLOAT_TEST label_error, label_pos, label_neg, label_zero
-	ftst                ;equivalent met fldz fcomp ST(1)
-	                    ;compare the value of ST(0) to +0.0
-	fstsw ax            ;copy the Status Word containing the result to AX
-	fwait               ;insure the previous instruction is completed
-	sahf                ;transfer the condition codes to the CPU's flag register
-	jpe label_error ;the comparison was indeterminate
-					    ;this condition should be verified first
-					    ;then only two of the next three conditional jumps
-					    ;should become necessary, in whatever order is preferred,
-					    ;the third jump being replaced by code to handle that case
-	ja   label_pos   ;when all flags are 0
-	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
-	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
-ENDM FLOAT_TEST
-
-MACRO FLOAT_TEST_stx st_num, label_error, label_pos, label_neg, label_zero
-	fcomp st( st_num )
-	fstsw ax            ;copy the Status Word containing the result to AX
-	fwait               ;insure the previous instruction is completed
-	sahf                ;transfer the condition codes to the CPU's flag register
-	jpe label_error ;the comparison was indeterminate
-					    ;this condition should be verified first
-					    ;then only two of the next three conditional jumps
-					    ;should become necessary, in whatever order is preferred,
-					    ;the third jump being replaced by code to handle that case
-	ja   label_pos   ;when all flags are 0
-	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
-	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
-ENDM FLOAT_TEST
-
-;st0 = st(0)^st(1)
-MACRO POW
-;;SOURCE https://www.madwizard.org/programming/snippets?id=36
-    fyl2x; y*log_2 (x); 1 erop
-    fld1
-    fld st(1); 3 er op
-    fprem; Remainder = ST(0) - (Q * ST(1)) , Q = truncating the quotient of ST(0)÷ST(1)
-    f2xm1; 2^x -1; 3 er op
-    fadd
-    fscale; 3 er op
-    fxch st(1)
-    fstp st
-ENDM POW
-
-MACRO FLOAT_TEST_stx_enable st_num, enable_err, enable_pos, enable_neg, enable_zero, label_error, label_pos, label_neg, label_zero
-	fcomp st( st_num )
-	fstsw ax            ;copy the Status Word containing the result to AX
-	fwait               ;insure the previous instruction is completed
-	sahf                ;transfer the condition codes to the CPU's flag register
-IF enable_err
-	jpe label_error ;the comparison was indeterminate
-					    ;this condition should be verified first
-					    ;then only two of the next three conditional jumps
-					    ;should become necessary, in whatever order is preferred,
-					    ;the third jump being replaced by code to handle that case
-ENDIF
-IF enable_pos
-	ja   label_pos   ;when all flags are 0
-ENDIF
-IF enable_neg
-	jb   label_neg   ;only the C0 bit (CF flag) would be set if no error
-ENDIF
-IF enable_zero
-	jz   label_zero       ;only the C3 bit (ZF flag) would be set if no error
-ENDIF
-ENDM FLOAT_TEST
 
 ; Converts float to byte
 ; stores the color in the line buffer
@@ -821,14 +864,14 @@ rep stosb
 	;fstp [dword ebx + ray_obj.]
 	
 	fldz
-	fst  [dword ebx + ray_obj.origin_x]
-	fst  [dword ebx + ray_obj.origin_y]
-	fstp  [dword ebx + ray_obj.origin_z]
-	
+	;fst  [dword ebx + ray_obj.origin_x]
+	;fstp  [dword ebx + ray_obj.origin_z]
+
+	VEC3_LOAD  <dword offset camera_start_origin.>
+	VEC3_STOREP <dword ebx + ray_obj.origin_>
 
 	fld1
 	fstp [dword ebx + ray_obj.direction_z]
-	
 
 	;---
 	; X-location
@@ -871,6 +914,7 @@ rep stosb
 	fdivp
 	fld  [dword offset nr_neg_half]
 	faddp
+	fchs
 	; Voor orthonormaal gebruik deze
 	;fst  [dword ebx + ray_obj.origin_y]
 	fstp [dword ebx + ray_obj.direction_y]
@@ -940,7 +984,7 @@ rep stosb
 	; Averaged Color
 	;---
 	mov edi, offset pixel_samples
-	;call average_4_color_res, edi, edi
+	call average_4_color_res, edi, edi
 	
 	;---
 	; Prepare to put pixel in pixel row
@@ -1018,27 +1062,36 @@ PROC ray_info
 	
 	fldz
 	fst  [dword ebx + ray_obj.origin_x]
-	fst  [dword ebx + ray_obj.origin_y]
 	fstp  [dword ebx + ray_obj.origin_z]
-	
 
 	fld1
-	fstp [dword ebx + ray_obj.direction_z]
-	
+	fstp  [dword ebx + ray_obj.origin_y]	
 
-	;---
-	; X-location
-	;---
-	fild [dword @@PIXEL_Y]
-	fstp  [dword ebx + ray_obj.direction_x]
-	; Voor orthonormaal gebruik deze
-	;fstp  [dword ebx + ray_obj.origin_x]
-	
-	;---
-	; Y-location
-	;--- 
-	fild [dword @@PIXEL_Y]
+	;fld1
+	;fstp [dword ebx + ray_obj.direction_z]
+	;
+	;
+	;;---
+	;; X-location
+	;;---
+	;fild [dword @@PIXEL_Y]
+	;fstp  [dword ebx + ray_obj.direction_x]
+	;; Voor orthonormaal gebruik deze
+	;;fstp  [dword ebx + ray_obj.origin_x]
+	;
+	;;---
+	;; Y-location
+	;;--- 
+	;fild [dword @@PIXEL_Y]
+	;fstp [dword ebx + ray_obj.direction_y]
+
+	fld1
+	;fchs
 	fstp [dword ebx + ray_obj.direction_y]
+	fldz
+	fst  [dword ebx + ray_obj.direction_x]
+	fstp [dword ebx + ray_obj.direction_z]
+
 
 	;---
 	; Zet de kleur multiplier naar 1.0, 1.0, 1.0
@@ -1071,7 +1124,9 @@ DATASEG
 	nr_half           dd 0.5
 	nr_background     dd 0.5
 	nr_zero           dd 0.0
-	
+	nr_tiny           dd 0.0001
+	nr_ground_reflectivity dd 0.7
+	nr_n2             dd -2.0
 	;---
 	; SRGB COLOR SPACE VALUES
 	;---
@@ -1093,9 +1148,9 @@ DATASEG
 	; Initialize sphere
 	;---
 	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.2, 0.2, 0.0, 1>,\
-	                        <0.2,  0.0, 0.7, 0.1, 0.2, 0.5, 0.2, 0.0, 1>,\
-	                        <0.0,  0.0, 2.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1>
+	sphere_datas sphere_obj <-0.2, 0.0, 0.7, 0.1, 0.5, 0.2, 0.2, 1.0, 0.1, 1>,\
+	                        <0.2,  0.0, 0.7, 0.1, 0.2, 0.5, 0.2, 1.0, 0.1, 1>,\
+	                        <0.0,  1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1>
 
 	;num_spheres  dd 1
 	;sphere_datas sphere_obj <0.0,  0.0, 3.0, 1.0, 1.0, 1.0, 1.0, 1>
@@ -1106,6 +1161,8 @@ DATASEG
 	;background_colors vec3 <1.0, 1.0, 1.0>, <0.5, 0.7, 1.0>
 	;background_colors vec3 <1.0, 1.0, 1.0>, <1.0, 1.0, 1.0>
 	;background_colors vec3 <0.0, 0.0, 0.0>, <1.0, 1.0, 1.0>
+	
+	camera_start_origin vec3 <0.0, 0.3, 0.0>;<0.3, 0.1, -0.3>
 UDATASEG
 	pixel_row db NUM_PIXEL_ROW_BYTES dup (?)
 END

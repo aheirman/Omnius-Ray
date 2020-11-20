@@ -1,0 +1,14 @@
+Open Watcom Make Version 1.9
+Portions Copyright (c) 1988-2002 Sybase, Inc. All Rights Reserved.
+Source code is available under the Sybase Open Watcom Public License.
+See http://www.openwatcom.org/ for details.
+Turbo Assembler  Version 4.1  Copyright (c) 1988, 1996 Borland International
+
+Assembling file:   raytrace.asm
+	FLOAT_SKIP_IF_TINY
+*Warning* raytrace.asm(521) FLOAT_SKIP_IF_TINY(10) Instruction can be compacted with override
+Error messages:    None
+Warning messages:  1
+Passes:            2
+Remaining memory:  387k
+

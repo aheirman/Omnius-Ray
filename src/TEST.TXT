@@ -5,7 +5,31 @@ See http://www.openwatcom.org/ for details.
 Turbo Assembler  Version 4.1  Copyright (c) 1988, 1996 Borland International
 
 Assembling file:   raytrace.asm
-Error messages:    None
+	color_to_color 3, byte_vec3.z, 0;  r
+**Error** raytrace.asm(990) FLOAT_TEST_stx_enable(5) Missing argument or <
+	color_to_color 3, byte_vec3.z, 0;  r
+**Error** raytrace.asm(990) FLOAT_TEST_stx_enable(12) Missing argument or <
+	color_to_color 3, byte_vec3.z, 0;  r
+**Error** raytrace.asm(990) FLOAT_TEST_stx_enable(15) Missing argument or <
+	color_to_color 3, byte_vec3.z, 0;  r
+**Error** raytrace.asm(990) FLOAT_TEST_stx_enable(18) Missing argument or <
+	color_to_color 2, byte_vec3.y, 3;  g
+**Error** raytrace.asm(991) FLOAT_TEST_stx_enable(5) Missing argument or <
+	color_to_color 2, byte_vec3.y, 3;  g
+**Error** raytrace.asm(991) FLOAT_TEST_stx_enable(12) Missing argument or <
+	color_to_color 2, byte_vec3.y, 3;  g
+**Error** raytrace.asm(991) FLOAT_TEST_stx_enable(15) Missing argument or <
+	color_to_color 2, byte_vec3.y, 3;  g
+**Error** raytrace.asm(991) FLOAT_TEST_stx_enable(18) Missing argument or <
+	color_to_color 1, byte_vec3.x, 6;  b
+**Error** raytrace.asm(992) FLOAT_TEST_stx_enable(5) Missing argument or <
+	color_to_color 1, byte_vec3.x, 6;  b
+**Error** raytrace.asm(992) FLOAT_TEST_stx_enable(12) Missing argument or <
+	color_to_color 1, byte_vec3.x, 6;  b
+**Error** raytrace.asm(992) FLOAT_TEST_stx_enable(15) Missing argument or <
+	color_to_color 1, byte_vec3.x, 6;  b
+**Error** raytrace.asm(992) FLOAT_TEST_stx_enable(18) Missing argument or <
+Error messages:    12
 Warning messages:  None
 Passes:            2
 Remaining memory:  399k

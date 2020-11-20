@@ -21,6 +21,7 @@ INCLUDE "VEC.INC"
 INCLUDE "RAYTRACE.INC"
 INCLUDE "RAND.INC"
 INCLUDE "FILE.INC"
+INCLUDE "MACRO.INC"
 
 ; -------------------------------------------------------------------
 ; CODE
@@ -28,95 +29,61 @@ INCLUDE "FILE.INC"
 CODESEG
 
 PROC test_place
-	LOCAL @@v_tmp1:vec3, @@v_tmp2:vec3, @@tmp1:dword
+	LOCAL @@v_tmp1:vec3, @@v_tmp2:vec3, @@tmp1:dword, @@tmp2:dword
 	uses eax, ebx, ecx, edx, edi
-	
+	ret
 	lea eax, [@@v_tmp1]
-	mov ecx, [offset nr_1]
+	mov ecx, [dword offset nr_2]
 	mov [eax + vec3.x], ecx
 	mov [eax + vec3.y], ecx
 	mov [eax + vec3.z], ecx
 	
-	
-	mov ecx, [offset nr_four]
 	lea ebx, [@@v_tmp2]
-	call vec3_in_unit_hemisphere, eax, ecx, ebx
-	call print_vec3_x1000, ebx
-	call print_int, ebx
-	;call vec3_neg, ebx
-	;call print_vec3_x1000, ebx
+	mov ecx, [dword offset nr_3]
+	mov [ebx + vec3.x], ecx
+	mov [ebx + vec3.y], ecx
+	mov [ebx + vec3.z], ecx
+
+	fld [dword offset nr_half]
+	VEC3_LOAD  <dword eax + vec3.>
+	VEC3_LOAD  <dword ebx + vec3.>
+	;fldpi
+	;VEC3S_ST_MUL <6>
+	;VEC3_VEC3_ADD
+	;VEC3_VEC3_DOT_ST0
+	;VEC3_OFFSET_ST0_MUL <1>
+	;VEC3D_NORMALIZE
+	VEC3_VEC3_ST6_WEIGHTED_AVG
 	
+	;lea ecx, [@@tmp1]
+	;lea edx, [@@tmp2]
+	;fstp [dword ecx]
+	;fstp [dword edx]
+	
+	VEC3_STOREP <dword ebx + vec3.>
+	VEC3_STOREP <dword eax + vec3.>
+	call print_rounded_floatx1000, [dword ecx]
+	;call print_rounded_floatx1000, [dword edx]
+	call print_endl
+	call print_vec3_x1000, ebx
+	call print_vec3_x1000, eax
+
+	call print_int, 6
+
+	mov	ah,00h
+	int	16h
+	call terminate_process
+	
+@@error_handler:
+	mov ah, 09h
+	mov edx, offset msg_comparison_was_indeterminate
+	int 21h
 	
 	mov	ah,00h
 	int	16h
 	call terminate_process
 ENDP test_place
 
-PROC test_place_2
-@@LOCAL_STACK_SIZE EQU VEC3_SIZE
-	uses eax, ebx, ecx, edx, edi
-	
-	push ebp
-	mov ebp, esp
-	
-	mov ecx, @@LOCAL_STACK_SIZE
-	sub esp, ecx
-	;----------
-	; Zero initialize
-	xor eax, eax
-	cld
-	mov edi, esp
-rep stosb
-	;----------
-	
-	mov eax, offset pixel_samples
-	mov ecx, [offset nr_four]
-	mov [eax + vec3.x], ecx
-	mov [eax + vec3.y], ecx
-	mov [eax + vec3.z], ecx
-	call print_vec3, eax
-
-	lea ebx, [offset pixel_samples + VEC3_SIZE]
-	mov ecx, [offset nr_four]
-	mov [ebx + vec3.x], ecx
-	mov [ebx + vec3.y], ecx
-	mov [ebx + vec3.z], ecx
-	call print_vec3, ebx
-
-	lea ebx, [offset pixel_samples + 2*VEC3_SIZE]
-	mov ecx, [offset nr_two]
-	mov [ebx + vec3.x], ecx
-	mov [ebx + vec3.y], ecx
-	mov [ebx + vec3.z], ecx
-	call print_vec3, ebx
-
-	lea ebx, [offset pixel_samples + 3*VEC3_SIZE]
-	mov ecx, [offset nr_two]
-	mov [ebx + vec3.x], ecx
-	mov [ebx + vec3.y], ecx
-	mov [ebx + vec3.z], ecx
-	call print_vec3, ebx
-
-	mov edx, esp
-	call average_4_color_res, offset pixel_samples, offset pixel_samples
-	call print_vec3, eax
-
-	call vec3_mul_float_res, eax, [dword offset nr_10], edx
-	call print_vec3, edx
-	
-	mov	ah,00h
-	int	16h
-	call terminate_process
-ENDP test_place_2
-
-PROC test_place_3
-
-	
-	
-	mov	ah,00h
-	int	16h
-	call terminate_process
-ENDP test_place_3
 
 PROC main
 	sti
@@ -127,7 +94,7 @@ PROC main
 	finit
 	call rand_init
 	
-	;call test_place
+	call test_place
 	
 	call create_bmp
 	
@@ -136,7 +103,7 @@ PROC main
 	call updateColourPalette, 256
 	
 	call ray_trace
-	
+	call close_bmp
 	;call ray_info
 	
 	mov	ah,00h
@@ -152,13 +119,17 @@ ENDP main
 ; -------------------------------------------------------------------
 DATASEG
 	nr_four           dd 4.0
-	nr_two            dd 2.0
+	nr_2            dd 2.0
+	nr_3            dd 3.0
 	nr_1            dd 1.0
 	nr_10000 dd 10000.0
+	nr_tiny           dd 0.0001
+	nr_half dd 0.5
 
 	nr_10    dd 10.0
 	pixel_samples vec3  4 DUP(?)
 
+msg_comparison_was_indeterminate db "Floating point comparison was indeterminate", 13, 10, '$';
 ; -------------------------------------------------------------------
 ; STACK
 ; -------------------------------------------------------------------
