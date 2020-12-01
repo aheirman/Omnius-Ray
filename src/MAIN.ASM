@@ -22,6 +22,7 @@ INCLUDE "RAYTRACE.INC"
 INCLUDE "RAND.INC"
 INCLUDE "FILE.INC"
 INCLUDE "MACRO.INC"
+INCLUDE "KEYB.INC"
 
 ; -------------------------------------------------------------------
 ; CODE
@@ -120,18 +121,16 @@ PROC main
 	
 	call test_place
 	
-	call create_bmp
-	
 	call setVideoMode,13h
 	call truecolor_palette
 	call updateColourPalette, 256
 	
-	call ray_trace
-	call close_bmp
-	;call ray_info
+	call __keyb_installKeyboardHandler
+	call ray_trace, 1
+	call __keyb_uninstallKeyboardHandler
 	
-	mov	ah,00h
-	int	16h
+	;mov	ah,00h
+	;int	16h
 	
 	call terminate_process
 ENDP main

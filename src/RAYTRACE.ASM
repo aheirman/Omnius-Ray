@@ -22,15 +22,18 @@ INCLUDE "VIDEO.INC"
 INCLUDE "MISC.INC"
 INCLUDE "FILE.INC"
 INCLUDE "MACRO.INC"
+INCLUDE "KEYB.INC"
 
 ; compile-time constants (with macros)
-VMEMADR   EQU 0A0000h	; video memory address
-SCRWIDTH  EQU 320	; screen witdth
-SCRHEIGHT EQU 200	; screen height
+VMEMADR   EQU 0A0000h
+SCRWIDTH  EQU 320
+SCRHEIGHT EQU 200
 
-NUM_SUB_PIXELS          EQU 16;1;16;64
-NUM_SUB_PIXELS_PER_AXIS EQU 4;1;4;8
-MAX_BOUNCES             EQU 30
+NUM_SUB_PIXELS          EQU 1;16;1;16;64
+NUM_SUB_PIXELS_PER_AXIS EQU 1;1;4;8
+MAX_BOUNCES             EQU 5
+
+
 ; -------------------------------------------------------------------
 ; CODE
 ; -------------------------------------------------------------------
@@ -138,7 +141,7 @@ MACRO NEXT_RAY_DIR lambertian_mul_loc:=<text_string>, diffuse_mul_offset:=<text_
 	VEC3_LOAD   <edx + vec3.>; normaal
 	VEC3_LOAD   <edi + vec3.>
 	VEC3_VEC3_ADD; lambertian = normal + hemisphere
-	;;VEC3D_NORMALIZE
+	VEC3D_NORMALIZE
 	VEC3_STOREP <edi + vec3.>
 	
 	;;-------
@@ -153,7 +156,7 @@ MACRO NEXT_RAY_DIR lambertian_mul_loc:=<text_string>, diffuse_mul_offset:=<text_
 	fstp st(7)
 	VEC3S_ST_MUL <6>
 	VEC3_VEC3_ADD
-	;;VEC3D_NORMALIZE
+	VEC3D_NORMALIZE
 	
 	;;---
 	;; Neem een gewogen gemiddelde
@@ -392,6 +395,7 @@ rep stosb
 	;-------
 	; Is de nieuwe afstand de kleinste afstand die tot nu toe is gevonden?
 	;------
+	FLOAT_SKIP_IF_TINY
 	is_depth_smaller
 	fstp [ebx + ray_obj.depth]; Update the ray-depth
 	;-------------
@@ -757,7 +761,7 @@ ENDP intersect_objects
 ; It also does color space correction:
 ;	https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_framebuffer_sRGB.txt
 ; WARNING USES: EAX
-MACRO color_to_color loc_in_float_stack, bmp_offset, shr_number
+MACRO color_to_color loc_in_float_stack, bmp_offset, shr_number, screen_enable
 	LOCAL @@collor_correction_finished, @@exponential, @@not_cliping
 	;; Color space correction
 	;;if (cl < 0.0031308) {
@@ -792,12 +796,16 @@ MACRO color_to_color loc_in_float_stack, bmp_offset, shr_number
 	;;call print_endl
 	mov edx, 255
 @@not_cliping:
+	;; write to file
 	mov [byte ecx + bmp_offset], dl
+	
+IF screen_enable
 	;; Anden met 3e bovenste bits
 	and edx, 224
-	;call print_int, edx
 	shr edx, shr_number
 	add edi, edx
+ENDIF
+
 ENDM  color_to_color
 
 ;     _ __ __ _ _   _   | |_ _ __ __ _  ___ ___ 
@@ -805,40 +813,45 @@ ENDM  color_to_color
 ;    | | | (_| | |_| |  | |_| | | (_| | (_|  __/
 ;    |_|  \__,_|\__, |___\__|_|  \__,_|\___\___|
 ;               |___/_____|                     
-
+;
+; SETTINGS
+;   bit 0: HIGH: 1080p
+;          LOW:  LOW RES & square pixel correction
+;
 PROC ray_trace
-@@LOCAL_STACK_SIZE EQU RAY_SIZE + VEC3_SIZE + 4*3
-	LOCAL @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword,\
-	      @@TMP_VAR:dword
+	ARG @@SETTINGS:dword
+	LOCAL @@RAY:ray_obj, @@SUBPIXEL_X:dword, @@SUBPIXEL_Y:dword, @@PIXEL_X:dword, @@PIXEL_Y:dword,\
+	      @@TMP_VAR:dword, @@WIDTH:dword, @@HEIGHT:dword
 	USES eax, ebx, ecx, edx, esi, edi
 	
 	mov [dword @@SUBPIXEL_X], 0
 	mov [dword @@SUBPIXEL_Y], 0
 	mov [dword @@PIXEL_X], 0
 	mov [dword @@PIXEL_Y], 0
-	
-	mov ebx, esp
-	mov ecx, @@LOCAL_STACK_SIZE; DO NOT OPTIMIZE AWAY, IT IS ENEDED FOT THE ZERO INITIALIZE
-	sub esp, ecx
-	; store one ray
-	; store one point
-	; ecx of outerloop
-	; temporary
-	; temporary
-	
-	
-	;----------
-	; Zero initialize
-	xor eax, eax
-	mov edi, esp
-rep stosb
-	;call print_byte_list, RAY_SIZE + VEC3_SIZE + 4, esp
-	;--------
-	
-	sub ebx, RAY_SIZE
+	lea ebx, [@@RAY]
 
 	xor esi, esi
 	mov esi, 0a0000h
+
+	;---
+	; Settings
+	;---
+	mov eax, [dword @@SETTINGS]
+	and eax, 1
+	cmp eax, 1
+	jne  @@low_res
+	mov [dword @@WIDTH],  FILE_WIDTH
+	mov [dword @@HEIGHT], FILE_HEIGHT
+	jmp @@end_res
+@@low_res:
+	mov [dword @@WIDTH],  SCRWIDTH
+	mov [dword @@HEIGHT], SCRHEIGHT
+@@end_res:
+	call create_bmp, [dword @@WIDTH], [dword @@HEIGHT]
+
+
+
+
 
 @@begin_height_loop:
 	mov [dword @@PIXEL_Y], ecx
@@ -852,6 +865,14 @@ rep stosb
 @@begin_SUBPIXEL_X_loop:
 	mov [dword @@SUBPIXEL_X], ecx
 	xor ecx, ecx
+	
+	;---
+	; Do we need to stop?
+	;---
+	mov     al, [__keyb_rawScanCode]
+	cmp     al, 01h
+	je      @@finish ; check if ESC is pressed, otherwise keep looping
+	
 	
 	;; Zet de depth to infinity, hierdoor is iedere echte diepte kleiner
 	;fld1
@@ -885,8 +906,7 @@ rep stosb
 	fdivp
 	faddp
 	
-	mov  [dword @@TMP_VAR], SCRWIDTH
-	fild [dword @@TMP_VAR]
+	fild [dword @@WIDTH]
 	fdivp
 	fld [dword offset nr_neg_half]
 	faddp
@@ -894,9 +914,15 @@ rep stosb
 	;---
 	;Correct for the non square pixels
 	;---
+	mov eax, [dword @@SETTINGS]
+	and eax, 1
+	cmp eax, 1
+	je  @@no_square_pixel_correction
 	fld [dword offset nr_aspect_ratio]
 	fmulp
+@@no_square_pixel_correction:
 	fstp  [dword ebx + ray_obj.direction_x]
+
 	; Voor orthonormaal gebruik deze
 	;fstp  [dword ebx + ray_obj.origin_x]
 	
@@ -911,8 +937,7 @@ rep stosb
 	faddp
 	
 	
-	mov  [dword @@TMP_VAR], SCRHEIGHT
-	fild [dword @@TMP_VAR]
+	fild [dword @@HEIGHT]
 	fdivp
 	fld  [dword offset nr_neg_half]
 	faddp
@@ -985,11 +1010,7 @@ rep stosb
 	;---
 	; Averaged Color
 	;---
-	;mov edi, offset pixel_samples
-	;call average_4_color_res, edi, edi
 	AVERAGE_COLORS <dword offset pixel_samples>, <dword offset nr_sub_pixels>
-	;AVERAGE_COLOR <dword offset pixel_samples>, <VEC3_X_OFFSET>;, <dword offset nr_sub_pixels>
-	;aa
 	
 	;---
 	; Prepare to put pixel in pixel row
@@ -1011,38 +1032,57 @@ rep stosb
 	fld [dword edi + vec3.y]
 	fld [dword edi + vec3.x]
 	
+	;---
+	; color_to_color
+	;---
+	mov eax, [dword @@SETTINGS]
+	and eax, 1
+	cmp eax, 1
+	je  @@dont_write_to_frame_buffer
 	xor edi, edi; Will be used as the packed color
-	color_to_color 3, byte_vec3.z, 0;  r
-	color_to_color 2, byte_vec3.y, 3;  g
-	color_to_color 1, byte_vec3.x, 6;  b
+	color_to_color 3, byte_vec3.z, 0, 1;  r
+	color_to_color 2, byte_vec3.y, 3, 1;  g
+	color_to_color 1, byte_vec3.x, 6, 1;  b
+	mov [dword esi], edi; video geheugen adress
+	inc esi
+	jmp @@after_col_col
 
-	;--------------------
-	; End of color
-	;--------------------	
-	mov [dword esi], edi
-	
+@@dont_write_to_frame_buffer:
+	color_to_color 3, byte_vec3.z, 0, 0;  r
+	color_to_color 2, byte_vec3.y, 3, 0;  g
+	color_to_color 1, byte_vec3.x, 6, 0;  b
+@@after_col_col:
 
 
 	;---
 	; Pixel loops
 	;---
-	inc esi; video geheugen adress
 	mov ecx, [dword @@PIXEL_X]
 	inc ecx
-	cmp ecx, SCRWIDTH
+	cmp ecx, [dword @@WIDTH]
 	jnz @@begin_width_loop
 	
 	call write_row, offset pixel_row
 	
 	mov ecx, [dword @@PIXEL_Y]
 	inc ecx
-	cmp ecx, SCRHEIGHT
+	;---
+	; Minigame?
+	;---
+	mov eax, [dword @@SETTINGS]
+	and eax, 1
+	cmp eax, 1
+	jne  @@no_minigame
+	call print_int, ecx
+@@no_minigame:
+	cmp ecx, [dword @@HEIGHT]
 	jnz @@begin_height_loop
 	
-	add esp, @@LOCAL_STACK_SIZE
+@@finish:
+	call close_bmp
 	ret
 	
-	@@error_handler:
+@@error_handler:
 	mov ah, 09h
 	mov edx, offset msg_comparison_was_indeterminate
 	int 21h
@@ -1163,7 +1203,7 @@ DATASEG
 	
 	pixel_samples vec3 NUM_SUB_PIXELS DUP(?)
 	
-	background_colors vec3 <0.097, 0.118, 0.205>, <0.877, 0.579, 0.437>
+	background_colors vec3  <0.877, 0.579, 0.437>, <0.097, 0.118, 0.205>
 	;background_colors vec3 <1.0, 1.0, 1.0>, <0.5, 0.7, 1.0>
 	;background_colors vec3 <1.0, 1.0, 1.0>, <1.0, 1.0, 1.0>
 	;background_colors vec3 <0.0, 0.0, 0.0>, <1.0, 1.0, 1.0>
