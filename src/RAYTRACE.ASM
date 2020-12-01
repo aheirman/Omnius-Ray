@@ -28,8 +28,8 @@ VMEMADR   EQU 0A0000h	; video memory address
 SCRWIDTH  EQU 320	; screen witdth
 SCRHEIGHT EQU 200	; screen height
 
-NUM_SUB_PIXELS          EQU 4
-NUM_SUB_PIXELS_PER_AXIS EQU 2
+NUM_SUB_PIXELS          EQU 16;1;16;64
+NUM_SUB_PIXELS_PER_AXIS EQU 4;1;4;8
 MAX_BOUNCES             EQU 30
 ; -------------------------------------------------------------------
 ; CODE
@@ -985,8 +985,11 @@ rep stosb
 	;---
 	; Averaged Color
 	;---
-	mov edi, offset pixel_samples
-	call average_4_color_res, edi, edi
+	;mov edi, offset pixel_samples
+	;call average_4_color_res, edi, edi
+	AVERAGE_COLORS <dword offset pixel_samples>, <dword offset nr_sub_pixels>
+	;AVERAGE_COLOR <dword offset pixel_samples>, <VEC3_X_OFFSET>;, <dword offset nr_sub_pixels>
+	;aa
 	
 	;---
 	; Prepare to put pixel in pixel row
@@ -1128,6 +1131,8 @@ DATASEG
 	nr_zero           dd 0.0
 	nr_tiny           dd 0.0001
 	nr_n2             dd -2.0
+	nr_sub_pixels     dd NUM_SUB_PIXELS.0
+	
 	;---
 	; SRGB COLOR SPACE VALUES
 	;---
@@ -1148,14 +1153,15 @@ DATASEG
 	;---
 	; Initialize sphere
 	;---
-	num_spheres  dd 3
-	sphere_datas sphere_obj <-0.2, 0.36, 0.7, 0.1, 0.5, 0.2, 0.2, 1.0, 0.1, 1>,\
-	                        <0.2,  0.36, 0.7, 0.1, 0.2, 0.5, 0.2, 1.0, 0.1, 1>,\
-	                        <0.0,  1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1, 1>
+	num_spheres  dd 4
+	sphere_datas sphere_obj <-0.2, 0.36, 0.7, 0.1, 0.5,  0.2, 0.2,  1.0, 0.1, 1>,\
+	                        <0.2,  0.36, 0.7, 0.1, 0.2,  0.5, 0.2,  1.0, 0.1, 1>,\
+	                        <0.0,  1.0,  2.0, 1.0, 0.99, 1.0, 0.99, 1.0, 0.1, 1>,\
+							<0.0,  0.31, 0.7, 0.1, 0.9,  0.1, 0.9,  1.0, 0.9, 1>
 
 	plane plane_obj <0.7, 1.0, 0.1>
 	
-	pixel_samples vec3 4 DUP(?)
+	pixel_samples vec3 NUM_SUB_PIXELS DUP(?)
 	
 	background_colors vec3 <0.097, 0.118, 0.205>, <0.877, 0.579, 0.437>
 	;background_colors vec3 <1.0, 1.0, 1.0>, <0.5, 0.7, 1.0>

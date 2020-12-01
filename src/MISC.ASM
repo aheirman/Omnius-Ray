@@ -266,7 +266,8 @@ PROC random_float_n1_1
 	call rand
 	push eax
 	fild [dword esp]
-	fcos
+	fld [dword offset nr_32bit_signed]
+	fdivp
 	mov eax, [dword @@DEST_FLOAT_PTR]
 	fstp [dword eax]
 	pop eax
@@ -281,8 +282,9 @@ PROC random_float_0_1
 	push eax
 	mov ebx, esp
 	fild [dword ebx]
-	fcos
 	fabs
+	fld [dword offset nr_32bit_signed]
+	fdivp
 	mov eax, [dword @@DEST_FLOAT_PTR]
 	fstp [dword eax]
 	pop eax
@@ -292,4 +294,5 @@ ENDP
 DATASEG
     msg_end         db 13, 10, '$'; 13, 10 == carrige return & \n
 	nr_1000 dd 1000.0
+	nr_32bit_signed dd 2147483647.0
 END

@@ -53,20 +53,44 @@ PROC test_place
 	;VEC3_VEC3_DOT_ST0
 	;VEC3_OFFSET_ST0_MUL <1>
 	;VEC3D_NORMALIZE
-	VEC3_VEC3_ST6_WEIGHTED_AVG
+	;VEC3_VEC3_ST6_WEIGHTED_AVG
 	
-	;lea ecx, [@@tmp1]
-	;lea edx, [@@tmp2]
+	lea ecx, [@@tmp1]
+	lea edx, [@@tmp2]
 	;fstp [dword ecx]
 	;fstp [dword edx]
 	
 	VEC3_STOREP <dword ebx + vec3.>
 	VEC3_STOREP <dword eax + vec3.>
+	
+	call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
+	call print_rounded_floatx1000, [dword ecx]
+		call random_float_0_1, ecx
 	call print_rounded_floatx1000, [dword ecx]
 	;call print_rounded_floatx1000, [dword edx]
 	call print_endl
-	call print_vec3_x1000, ebx
-	call print_vec3_x1000, eax
+	;call print_vec3_x1000, ebx
+	;call print_vec3_x1000, eax
 
 	call print_int, 6
 

@@ -2,6 +2,9 @@
 
 ;Size: 3*4 bytes  = 12 bytes
 VEC3_SIZE EQU 12
+VEC3_X_OFFSET EQU 0
+VEC3_Y_OFFSET EQU 4
+VEC3_Z_OFFSET EQU 8
 STRUC vec3
 	x    dd 0.0
 	y    dd 0.0

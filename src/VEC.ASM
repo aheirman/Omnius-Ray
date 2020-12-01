@@ -131,32 +131,6 @@ PROC vec3_mul_float_res
 	ret
 ENDP vec3_mul_float_res
 
-;IMPORTANT: vec ptrs may aliase (That's good) :)
-;PROC vec_3_mul_float_ptr_res
-;	ARG @@VEC3_PTR:dword, @@multiplier_ptr:dword, @@res_ptr:dword
-;	USES eax, ebx, ecx
-;	
-;	mov eax, [@@VEC3_PTR]
-;	mov ecx, [@@res_ptr]
-;	
-;	fld [dword eax + vec3.x]
-;	fld [dword @@multiplier_ptr]
-;	faddp
-;	fstp [ecx + vec3.x]
-;	
-;	fld [dword  eax + vec3.y]
-;	fld [dword @@multiplier_ptr]
-;	faddp
-;	fstp [ecx + vec3.y]
-;	
-;	fld [dword eax + vec3.z]
-;	fld [dword @@multiplier_ptr]
-;	faddp
-;	fstp [ecx + vec3.z]
-;
-;	ret
-;ENDP vec_3_mul_float_ptr_res
-
 ;IMPORTANT: ptrs may aliase (That's good) :)
 PROC vec3_dot
 	ARG @@VEC3_PTR1:dword, @@VEC3_PTR2:dword, @@res_ptr:dword
@@ -290,50 +264,6 @@ PROC vec3_normalize_dest
 	
 	ret
 ENDP vec3_normalize_dest
-
-;NOTE: POINTERS MAY OVERLAP
-PROC average_4_color_res
-	ARG @@VEC3_ARRAY_PTR:dword, @@res_ptr:dword
-	USES eax, ecx
-	
-	mov eax, [@@VEC3_ARRAY_PTR]
-	mov ecx, [@@res_ptr]
-	
-	fld [dword eax + vec3.x]
-	fld [dword eax + VEC3_SIZE + vec3.x]
-	fld [dword eax + 2*VEC3_SIZE + vec3.x]
-	fld [dword eax + 3*VEC3_SIZE + vec3.x]
-	faddp
-	faddp
-	faddp
-	fld [dword offset nr_4]
-	fdivp st(1), st(0)
-	fstp [dword ecx + vec3.x]
-	
-	fld [dword eax + vec3.y]
-	fld [dword eax + VEC3_SIZE + vec3.y]
-	fld [dword eax + 2*VEC3_SIZE + vec3.y]
-	fld [dword eax + 3*VEC3_SIZE + vec3.y]
-	faddp
-	faddp
-	faddp
-	fld [dword offset nr_4]
-	fdivp st(1), st(0)
-	fstp [dword ecx + vec3.y]
-	
-	fld [dword eax + vec3.z]
-	fld [dword eax + VEC3_SIZE + vec3.z]
-	fld [dword eax + 2*VEC3_SIZE + vec3.z]
-	fld [dword eax + 3*VEC3_SIZE + vec3.z]
-	faddp
-	faddp
-	faddp
-	fld [dword offset nr_4]
-	fdivp st(1), st(0)
-	fstp [dword ecx + vec3.z]
-	
-	ret
-ENDP average_4_color_res
 
 PROC vec3_in_unit_sphere
 	;Uses: Rejection sampling

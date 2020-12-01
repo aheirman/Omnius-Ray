@@ -1,4 +1,4 @@
-
+INCLUDE "STRUC.INC"
 
 
 ; uses eax
@@ -428,3 +428,32 @@ MACRO VEC3D_NORMALIZE
 	VEC3_OFFSET_ST0_MUL <1>
 	fstp st(0)
 ENDM  VEC3D_NORMALIZE
+
+
+MACRO AVERAGE_COLORS buff_loc:=<text_string>, float_count_loc:=<text_string>
+	AVERAGE_COLOR <&buff_loc&>, <VEC3_X_OFFSET>, <&float_count_loc&>
+	AVERAGE_COLOR <&buff_loc&>, <VEC3_Y_OFFSET>, <&float_count_loc&>
+	AVERAGE_COLOR <&buff_loc&>, <VEC3_Z_OFFSET>, <&float_count_loc&>
+ENDM  AVERAGE_COLORS
+
+MACRO AVERAGE_COLOR buff_loc:=<text_string>, offset:=<text_string>, float_count_loc:=<text_string>
+	fld [buff_loc& + 0*VEC3_SIZE + &offset&]
+	index = 1
+	REPT NUM_SUB_PIXELS-1;
+		fld [&buff_loc& + index*VEC3_SIZE + &offset&]
+		faddp
+		index = index + 1
+	ENDM
+	
+	fld [&float_count_loc&]
+	fdivp st(1), st(0)
+	fstp [&buff_loc& + &offset&]
+ENDM  AVERAGE_COLOR
+
+
+
+
+
+
+
+
